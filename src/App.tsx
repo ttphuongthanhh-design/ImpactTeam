@@ -1163,10 +1163,10 @@ export default function App() {
                           <tr key={t.id}>
                             <td className="p-4 font-semibold">{t.title}</td>
                             <td className="p-4 text-muted">{t.subtype || '—'}</td>
-                            <td className="p-4">
+                            <td className="p-4 assignee-cell">
                               <div className="flex items-center gap-2">
                                 <span className="av" style={{ background: memberColor(t.assignee), color: '#fff' }}>{memberInitial(t.assignee)}</span>
-                                <span className="font-semibold">{memberName(t.assignee)}</span>
+                                <span className="font-semibold assignee-name">{memberName(t.assignee)}</span>
                               </div>
                             </td>
                             <td className="p-4 text-center">

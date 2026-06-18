@@ -902,6 +902,10 @@ button:active {
   overflow-wrap: anywhere;
 }
 .daily-table td:last-child { min-width: 220px; }
+/* Keep the assignee name on one line (avatar + full name, no mid-word break) */
+.daily-table th:nth-child(3) { width: 150px; }
+.assignee-cell { white-space: nowrap; word-break: normal; overflow-wrap: normal; }
+.assignee-name { white-space: nowrap; }
 .daily-table tr:last-child td {
   border-bottom: none;
 }
