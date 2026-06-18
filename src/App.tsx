@@ -1,0 +1,1436 @@
+import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
+import { 
+  Plus, 
+  Trash2, 
+  Edit2, 
+  Calendar, 
+  Search, 
+  Check, 
+  X, 
+  AlertCircle, 
+  Clock, 
+  TrendingUp, 
+  Users, 
+  Percent, 
+  FileText, 
+  Download, 
+  ChevronLeft, 
+  ChevronRight,
+  Sparkles,
+  Sun,
+  Moon
+} from 'lucide-react';
+
+// Interfaces
+interface Task {
+  id: number;
+  title: string;
+  desc: string;
+  scope: 'ae' | 'si' | 'da' | 'pr';
+  subtype: string;
+  assignee: 'T' | 'M';
+  priority: 'high' | 'med' | 'low';
+  col: number; // 0: Backlog, 1: In Progress, 2: Review, 3: Done, 4: Failed/Reject
+  start: string;
+  deadline: string;
+  pct: number;
+  note: string;
+}
+
+interface ScopeConfig {
+  name: string;
+  color: string;
+  glow: string;
+  badge: string;
+  text: string;
+}
+
+// Constant Constants
+const COLS = ['Backlog', 'In Progress', 'Review', 'Done', 'Failed / Reject'];
+const MEMBERS = { T: 'TIFFANY', M: 'MERCURY' };
+const ROLES = { T: 'Senior — Host Lead', M: 'Production Executive' };
+const SCOPES: Record<'ae' | 'si' | 'da' | 'pr', string> = {
+  ae: 'Activation & Event',
+  si: 'Social & Influencers',
+  da: 'Data & AI',
+  pr: 'Production'
+};
+
+const SCOPE_CONFIGS: Record<'ae' | 'si' | 'da' | 'pr', ScopeConfig> = {
+  ae: { 
+    name: 'Activation & Event', 
+    color: '#8b5cf6', 
+    glow: 'rgba(139, 92, 246, 0.25)', 
+    badge: 'bg-violet-950/40 text-violet-400 border border-violet-800/30',
+    text: 'text-violet-400'
+  },
+  si: { 
+    name: 'Social & Influencers', 
+    color: '#ec4899', 
+    glow: 'rgba(236, 72, 153, 0.25)', 
+    badge: 'bg-pink-950/40 text-pink-400 border border-pink-800/30',
+    text: 'text-pink-400'
+  },
+  da: { 
+    name: 'Data & AI', 
+    color: '#06b6d4', 
+    glow: 'rgba(6, 182, 212, 0.25)', 
+    badge: 'bg-cyan-950/40 text-cyan-400 border border-cyan-800/30',
+    text: 'text-cyan-400'
+  },
+  pr: { 
+    name: 'Production', 
+    color: '#f43f5e', 
+    glow: 'rgba(244, 63, 94, 0.25)', 
+    badge: 'bg-rose-950/40 text-rose-400 border border-rose-800/30',
+    text: 'text-rose-400'
+  }
+};
+
+const COL_COLORS = ['#94a3b8', '#f59e0b', '#3b82f6', '#10b981', '#ef4444'];
+const PRIORITY_BADGES = {
+  high: 'bg-red-950/40 text-red-400 border border-red-800/30',
+  med: 'bg-amber-950/40 text-amber-400 border border-amber-800/30',
+  low: 'bg-blue-950/40 text-blue-400 border border-blue-800/30'
+};
+
+const defaultSubtypes: Record<'ae' | 'si' | 'da' | 'pr', string[]> = {
+  ae: ['Planning & Brief', 'Concept Development', 'Vendor Management', 'Site Survey', 'Timeline & Budget', 'Proposal / Sale Kit', 'Post-event Report'],
+  si: ['Influencer Scouting', 'Influencer Brief', 'Content Plan', 'KOL Coordination', 'Performance Tracking', 'Community Management'],
+  da: ['Data Collection', 'Dashboard & Report', 'Audience Segmentation', 'AI Tool / Automation', 'Insight Analysis', 'Template & System'],
+  pr: ['Site Survey', 'Quotation & Supplier', 'Production Monitoring', 'POSM / Print', 'Logistics & Setup', 'PG/PB Management', 'Onsite Supervision', 'Post-production Report', 'Checklist & QC']
+};
+
+const GANTT_DAYS = 42; // 6 weeks view
+
+const defaultTasks: Task[] = [
+  { id: 1, title: 'Brief intake & concept — Q3 Activation', desc: '', scope: 'ae', subtype: 'Concept Development', assignee: 'T', priority: 'high', col: 1, start: '2025-07-01', deadline: '2025-07-08', pct: 40, note: 'Đang hoàn thiện mood board' },
+  { id: 2, title: 'Vendor quotation — summer pop-up', desc: '', scope: 'pr', subtype: 'Quotation & Supplier', assignee: 'M', priority: 'high', col: 1, start: '2025-07-02', deadline: '2025-07-10', pct: 30, note: 'Đã liên hệ 3/6 vendor' },
+  { id: 3, title: 'Site survey — Quận 1', desc: '', scope: 'pr', subtype: 'Site Survey', assignee: 'M', priority: 'high', col: 2, start: '2025-07-01', deadline: '2025-07-05', pct: 80, note: 'Đã survey, đang viết báo cáo' },
+  { id: 4, title: 'Timeline & logistics plan Q3', desc: '', scope: 'ae', subtype: 'Timeline & Budget', assignee: 'T', priority: 'high', col: 1, start: '2025-07-03', deadline: '2025-07-12', pct: 50, note: 'Đang draft timeline' },
+  { id: 5, title: 'KOL list — July campaign', desc: '', scope: 'si', subtype: 'Influencer Scouting', assignee: 'T', priority: 'med', col: 0, start: '2025-07-07', deadline: '2025-07-15', pct: 10, note: '' },
+  { id: 6, title: 'Content plan — Social July', desc: '', scope: 'si', subtype: 'Content Plan', assignee: 'T', priority: 'high', col: 2, start: '2025-06-25', deadline: '2025-07-01', pct: 75, note: 'Chờ client approve' },
+  { id: 7, title: 'Performance dashboard — KPI', desc: '', scope: 'da', subtype: 'Dashboard & Report', assignee: 'T', priority: 'high', col: 1, start: '2025-07-01', deadline: '2025-07-03', pct: 60, note: 'Đang pull data từ Meta' },
+  { id: 8, title: 'Audience segmentation Q2', desc: '', scope: 'da', subtype: 'Audience Segmentation', assignee: 'T', priority: 'low', col: 3, start: '2025-06-20', deadline: '2025-06-30', pct: 100, note: 'Hoàn thành' },
+  { id: 9, title: 'POSM production monitoring', desc: '', scope: 'pr', subtype: 'Production Monitoring', assignee: 'M', priority: 'high', col: 1, start: '2025-07-03', deadline: '2025-07-08', pct: 45, note: 'Đang theo dõi tại xưởng' },
+  { id: 10, title: 'PG/PB recruitment & briefing', desc: '', scope: 'pr', subtype: 'PG/PB Management', assignee: 'M', priority: 'med', col: 0, start: '2025-07-10', deadline: '2025-07-18', pct: 0, note: '' },
+  { id: 11, title: 'AI reporting template', desc: '', scope: 'da', subtype: 'AI Tool / Automation', assignee: 'T', priority: 'low', col: 3, start: '2025-06-22', deadline: '2025-06-28', pct: 100, note: 'Done' },
+  { id: 12, title: 'Sale kit & proposal — Activation', desc: '', scope: 'ae', subtype: 'Proposal / Sale Kit', assignee: 'T', priority: 'med', col: 0, start: '2025-07-14', deadline: '2025-07-22', pct: 0, note: '' },
+  { id: 13, title: 'Logistics & setup plan — onsite', desc: '', scope: 'pr', subtype: 'Logistics & Setup', assignee: 'M', priority: 'med', col: 1, start: '2025-07-05', deadline: '2025-07-14', pct: 20, note: 'Đang liên hệ vendor vận chuyển' },
+  { id: 14, title: 'Checklist QC — pre-event', desc: '', scope: 'pr', subtype: 'Checklist & QC', assignee: 'M', priority: 'high', col: 0, start: '2025-07-12', deadline: '2025-07-19', pct: 0, note: '' },
+  { id: 15, title: 'Influencer brief & contract', desc: '', scope: 'si', subtype: 'Influencer Brief', assignee: 'T', priority: 'med', col: 0, start: '2025-07-12', deadline: '2025-07-20', pct: 0, note: '' }
+];
+
+export default function App() {
+  // --- States ---
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    try {
+      const saved = localStorage.getItem('impact_tasks');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return defaultTasks;
+  });
+
+  const [subtypes, setSubtypes] = useState<Record<'ae' | 'si' | 'da' | 'pr', string[]>>(() => {
+    try {
+      const saved = localStorage.getItem('impact_subtypes');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return defaultSubtypes;
+  });
+
+  const [activeTab, setActiveTab] = useState<'dash' | 'kanban' | 'timeline' | 'daily' | 'weekly'>('dash');
+
+  const [darkMode, setDarkMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('impact_darkMode');
+      return saved === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('impact_darkMode', String(darkMode));
+      if (darkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [darkMode]);
+
+  // Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState<'all' | 'T' | 'M'>('all');
+  const [scopeFilter, setScopeFilter] = useState<'all' | 'ae' | 'si' | 'da' | 'pr'>('all');
+  const [timelineScopeFilter, setTimelineScopeFilter] = useState<'all' | 'ae' | 'si' | 'da' | 'pr'>('all');
+
+  // Date States
+  const [ganttStart, setGanttStart] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - 14);
+    return d;
+  });
+  const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [weeklyNote, setWeeklyNote] = useState('');
+
+  // Modal States
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [taskForm, setTaskForm] = useState<Omit<Task, 'id'>>({
+    title: '',
+    desc: '',
+    scope: 'ae',
+    subtype: '',
+    assignee: 'T',
+    priority: 'high',
+    col: 0,
+    start: '',
+    deadline: '',
+    pct: 0,
+    note: ''
+  });
+
+  const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+  const [newSubtypeInput, setNewSubtypeInput] = useState('');
+  const [isAddingSubtype, setIsAddingSubtype] = useState(false);
+
+  // --- Effects ---
+  useEffect(() => {
+    localStorage.setItem('impact_tasks', JSON.stringify(tasks));
+  }, [tasks]);
+
+  useEffect(() => {
+    localStorage.setItem('impact_subtypes', JSON.stringify(subtypes));
+  }, [subtypes]);
+
+  // --- Helpers ---
+  const handleOpenAddModal = (colIndex: number) => {
+    setEditId(null);
+    setTaskForm({
+      title: '',
+      desc: '',
+      scope: 'ae',
+      subtype: defaultSubtypes.ae[0] || '',
+      assignee: 'T',
+      priority: 'high',
+      col: colIndex,
+      start: '',
+      deadline: '',
+      pct: 0,
+      note: ''
+    });
+    setIsAddingSubtype(false);
+    setNewSubtypeInput('');
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (task: Task) => {
+    setEditId(task.id);
+    setTaskForm({ ...task });
+    setIsAddingSubtype(false);
+    setNewSubtypeInput('');
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditId(null);
+  };
+
+  const handleDeleteTask = (id: number) => {
+    if (confirm('Delete this task?')) {
+      setTasks(prev => prev.filter(t => t.id !== id));
+      if (isModalOpen && editId === id) setIsModalOpen(false);
+    }
+  };
+
+  const handleSaveTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskForm.title.trim()) return alert('Please enter a task title.');
+
+    const formattedForm = { ...taskForm };
+    if (formattedForm.pct === 100) formattedForm.col = 3;
+    if (formattedForm.col === 3) formattedForm.pct = 100;
+
+    if (editId !== null) {
+      setTasks(prev => prev.map(t => t.id === editId ? { ...t, ...formattedForm } : t));
+    } else {
+      const nextId = tasks.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+      setTasks(prev => [...prev, { id: nextId, ...formattedForm }]);
+    }
+    setIsModalOpen(false);
+  };
+
+  const updateTaskField = (id: number, field: keyof Task, value: any) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === id) {
+        const updated = { ...t, [field]: value };
+        if (field === 'pct') {
+          updated.pct = Math.min(100, Math.max(0, +value || 0));
+          if (updated.pct === 100) updated.col = 3;
+        } else if (field === 'col') {
+          updated.col = +value;
+          if (updated.col === 3) updated.pct = 100;
+        } else if (field === 'note') {
+          updated.note = value.trim();
+        }
+        return updated;
+      }
+      return t;
+    }));
+  };
+
+  // Subtype Customization
+  const handleAddSubtype = () => {
+    const val = newSubtypeInput.trim();
+    if (!val) return;
+    const scope = taskForm.scope;
+    if (!subtypes[scope].includes(val)) {
+      setSubtypes(prev => ({
+        ...prev,
+        [scope]: [...prev[scope], val]
+      }));
+    }
+    setTaskForm(prev => ({ ...prev, subtype: val }));
+    setNewSubtypeInput('');
+    setIsAddingSubtype(false);
+  };
+
+  const handleRemoveSubtype = (scope: 'ae' | 'si' | 'da' | 'pr', val: string) => {
+    setSubtypes(prev => ({
+      ...prev,
+      [scope]: prev[scope].filter(s => s !== val)
+    }));
+    if (taskForm.scope === scope && taskForm.subtype === val) {
+      setTaskForm(prev => ({ ...prev, subtype: '' }));
+    }
+  };
+
+  // Shifting Gantt Window
+  const handleShiftTimeline = (days: number) => {
+    if (days === 0) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - 14);
+      setGanttStart(d);
+    } else {
+      setGanttStart(prev => {
+        const d = new Date(prev);
+        d.setDate(prev.getDate() + days);
+        return d;
+      });
+    }
+  };
+
+  // Excel Exports
+  const handleExportTimelineExcel = () => {
+    const rows = tasks.filter(t => t.start || t.deadline).map(t => ({
+      'Scope': SCOPES[t.scope],
+      'Task': t.title,
+      'Assignee': MEMBERS[t.assignee],
+      'Sub-type': t.subtype || '',
+      'Priority': t.priority.toUpperCase(),
+      'Start date': t.start || '',
+      'Deadline': t.deadline || '',
+      'Status': COLS[t.col],
+      '% Complete': t.pct || 0
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 22 }, { wch: 42 }, { wch: 10 }, { wch: 22 }, { wch: 9 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Master Timeline');
+    XLSX.writeFile(wb, `IMPACT_Timeline_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // Date Label Helper for Kanban
+  const getDeadlineBadge = (deadline: string, col: number) => {
+    if (!deadline || col === 3 || col === 4) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dd = new Date(deadline); dd.setHours(0,0,0,0);
+    const diff = Math.round((dd.getTime() - today.getTime()) / 864e5);
+    const fmt = dd.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+
+    if (diff < 0) {
+      return <div className="mt-1 text-[10px] font-bold text-red-400 bg-red-950/20 px-2 py-0.5 rounded border border-red-900/30">⚠ Overdue: {fmt}</div>;
+    }
+    if (diff === 0) {
+      return <div className="mt-1 text-[10px] font-bold text-amber-400 bg-amber-950/20 px-2 py-0.5 rounded border border-amber-900/30">Today: {fmt}</div>;
+    }
+    if (diff <= 3) {
+      return <div className="mt-1 text-[10px] font-semibold text-amber-400">⏳ {fmt} ({diff}d)</div>;
+    }
+    return <div className="mt-1 text-[10px] text-slate-400">📅 {fmt}</div>;
+  };
+
+  // Weekly Date Range Calc
+  const getWeeklyDateRange = () => {
+    const today = new Date();
+    const day = today.getDay();
+    const mon = new Date(today);
+    mon.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    return { mon, sun };
+  };
+
+  const handlePrintDaily = () => {
+    const target = document.getElementById('pg-daily');
+    if (target) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('print-target'));
+      target.classList.add('print-target');
+      window.print();
+    }
+  };
+
+  const handlePrintWeekly = () => {
+    const target = document.getElementById('pg-weekly');
+    if (target) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('print-target'));
+      target.classList.add('print-target');
+      window.print();
+    }
+  };
+
+  return (
+    <div className="min-h-screen pb-12">
+      {/* Navigation */}
+      <nav className="no-print">
+        <div className="nav-logo">IMPACT TEAM</div>
+        <div className={`nav-tab ${activeTab === 'dash' ? 'active' : ''}`} onClick={() => setActiveTab('dash')}>Dashboard</div>
+        <div className={`nav-tab ${activeTab === 'kanban' ? 'active' : ''}`} onClick={() => setActiveTab('kanban')}>Kanban</div>
+        <div className={`nav-tab ${activeTab === 'timeline' ? 'active' : ''}`} onClick={() => setActiveTab('timeline')}>Gantt Timeline</div>
+        <div className={`nav-tab ${activeTab === 'daily' ? 'active' : ''}`} onClick={() => setActiveTab('daily')}>Daily Report</div>
+        <div className={`nav-tab ${activeTab === 'weekly' ? 'active' : ''}`} onClick={() => setActiveTab('weekly')}>Weekly Report</div>
+        <div className="nav-right">
+          <button 
+            type="button" 
+            onClick={() => setDarkMode(!darkMode)} 
+            className="p-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-slate-300 transition-colors mr-2 flex items-center justify-center"
+            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            style={{ width: '32px', height: '32px', padding: 0 }}
+          >
+            {darkMode ? <Sun size={14} className="text-yellow-400" /> : <Moon size={14} />}
+          </button>
+          <button className="btn-p" onClick={() => handleOpenAddModal(0)}>
+            <Plus size={14} /> New Task
+          </button>
+        </div>
+      </nav>
+
+      {/* Pages Container */}
+      <main className="px-6 mt-6">
+        {/* --- 1. DASHBOARD --- */}
+        {activeTab === 'dash' && (
+          <div className="page active">
+            <div className="dash-grid">
+              <div className="dash-card">
+                <div className="dc-val text-indigo-400">{tasks.length}</div>
+                <div className="dc-lbl">Total Tasks</div>
+                <div className="dc-sub text-slate-400">
+                  <Clock size={11} className="inline text-slate-400" /> {tasks.filter(t => t.col === 1).length} active · {tasks.filter(t => t.col === 3).length} completed
+                </div>
+              </div>
+              <div className="dash-card">
+                <div className="dc-val text-emerald-400">
+                  {tasks.length ? Math.round(tasks.filter(t => t.col === 3).length / tasks.length * 100) : 0}%
+                </div>
+                <div className="dc-lbl">Overall Completion</div>
+                <div className="dc-sub text-slate-400">
+                  <Percent size={11} className="inline" /> Avg progress: {tasks.filter(t => t.col !== 3 && t.col !== 4).length ? Math.round(tasks.filter(t => t.col !== 3 && t.col !== 4).reduce((sum, t) => sum + (t.pct || 0), 0) / tasks.filter(t => t.col !== 3 && t.col !== 4).length) : 0}%
+                </div>
+              </div>
+              <div className="dash-card">
+                <div className="dc-val text-rose-500">
+                  {tasks.filter(t => {
+                    if (!t.deadline || t.col === 3 || t.col === 4) return false;
+                    const d = new Date(t.deadline); d.setHours(0,0,0,0);
+                    return d < new Date();
+                  }).length}
+                </div>
+                <div className="dc-lbl">Overdue Tasks</div>
+                <div className="dc-sub text-slate-400">
+                  <AlertCircle size={11} className="inline text-rose-400" /> Urgent focus required
+                </div>
+              </div>
+              <div className="dash-card">
+                <div className="dc-val text-amber-500">
+                  {tasks.filter(t => t.priority === 'high' && t.col !== 3 && t.col !== 4).length}
+                </div>
+                <div className="dc-lbl">High Priority Pending</div>
+                <div className="dc-sub text-slate-400">
+                  <TrendingUp size={11} className="inline text-amber-400" /> Across all projects
+                </div>
+              </div>
+            </div>
+
+            <div className="dash-row-3">
+              {/* Scope Health */}
+              <div className="panel">
+                <h3>Scope Health <span>% completion by scope</span></h3>
+                <div className="flex flex-col gap-4 mt-2">
+                  {(['ae', 'si', 'da', 'pr'] as const).map(sc => {
+                    const st = tasks.filter(t => t.scope === sc);
+                    if (!st.length) return null;
+                    const pct = Math.round(st.reduce((sum, t) => sum + (t.pct || 0), 0) / st.length);
+                    const config = SCOPE_CONFIGS[sc];
+                    if (!config) return null;
+                    
+                    const isGood = pct >= 70;
+                    const isWarning = pct >= 40 && pct < 70;
+                    const statusText = isGood ? 'On Track' : isWarning ? 'At Risk' : 'Off Track';
+                    const statusColor = isGood ? 'text-emerald-400' : isWarning ? 'text-amber-400' : 'text-rose-400';
+                    const statusBg = isGood ? 'bg-emerald-950/20' : isWarning ? 'bg-amber-950/20' : 'bg-rose-950/20';
+
+                    return (
+                      <div className="scope-row" key={sc}>
+                        <div className="risk-dot" style={{ background: isGood ? '#10b981' : isWarning ? '#f59e0b' : '#ef4444', color: isGood ? '#10b981' : isWarning ? '#f59e0b' : '#ef4444' }}></div>
+                        <div className="scope-name-lbl font-semibold">{config.name}</div>
+                        <div className="scope-track">
+                          <div className="scope-track-fill" style={{ width: `${pct}%`, background: config.color }}></div>
+                        </div>
+                        <div className={`scope-pct-lbl ${statusColor}`}>{pct}%</div>
+                        <span className={`badge ${statusBg} ${statusColor} ml-2 font-bold`}>{statusText}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Team Velocity */}
+              <div className="panel">
+                <h3>Team Velocity <span>tasks completed</span></h3>
+                <div className="velocity-bar">
+                  {[2, 3, 1, 4, 2, tasks.filter(t => t.col === 3).length].map((val, i) => {
+                    const max = Math.max(val, 5);
+                    const h = Math.round((val / max) * 70);
+                    const labels = ['W-5', 'W-4', 'W-3', 'W-2', 'W-1', 'Now'];
+                    return (
+                      <div className="vel-col-wrap" key={i}>
+                        <div className="vel-col" style={{ height: `${h}px`, background: i === 5 ? 'var(--color-primary)' : 'rgba(99, 102, 241, 0.3)' }}></div>
+                        <div className="vel-lbl">{labels[i]}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="dash-row">
+              {/* Member Workload */}
+              <div className="panel">
+                <h3>Member Workload</h3>
+                <div className="flex flex-col">
+                  {(['T', 'M'] as const).map(m => {
+                    const mt = tasks.filter(t => t.assignee === m);
+                    const scArr = m === 'T' ? (['ae', 'si', 'da'] as const) : (['pr'] as const);
+                    return (
+                      <div className="member-load" key={m}>
+                        <div className={`av av-${m} w-8 h-8 text-xs font-bold`}>{m}</div>
+                        <div className="ml-info">
+                          <div className="ml-name">{MEMBERS[m]}</div>
+                          <div className="ml-role">{ROLES[m]} · {mt.length} tasks</div>
+                        </div>
+                        <div className="ml-bar-wrap">
+                          {scArr.map(sc => {
+                            const st = mt.filter(t => t.scope === sc);
+                            const pct = st.length ? Math.round(st.reduce((sum, t) => sum + (t.pct || 0), 0) / st.length) : 0;
+                            return (
+                              <div className="ml-bar-row" key={sc}>
+                                <span className="ml-label text-slate-400 font-semibold">{SCOPES[sc].split(' ')[0]}</span>
+                                <div className="ml-bar">
+                                  <div className="ml-fill" style={{ width: `${pct}%`, background: SCOPE_CONFIGS[sc].color }}></div>
+                                </div>
+                                <span className="ml-val">{pct}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Overdue Items list */}
+              <div className="panel">
+                <h3>Overdue & At-Risk Items</h3>
+                <div className="overdue-list">
+                  {tasks.filter(t => {
+                    if (!t.deadline || t.col === 3 || t.col === 4) return false;
+                    const d = new Date(t.deadline); d.setHours(0,0,0,0);
+                    return d < new Date();
+                  }).map(t => {
+                    const d = new Date(t.deadline); d.setHours(0,0,0,0);
+                    const today = new Date(); today.setHours(0,0,0,0);
+                    const diffDays = Math.round((today.getTime() - d.getTime()) / 864e5);
+                    return (
+                      <div className="overdue-item" key={t.id}>
+                        <span className="overdue-item-dot bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></span>
+                        <div className="flex-1">
+                          <div className="overdue-item-title font-semibold text-white">{t.title}</div>
+                          <div className="overdue-item-meta text-[10px] text-slate-400">
+                            {SCOPES[t.scope]} · {MEMBERS[t.assignee]} · <strong className="text-rose-400">{diffDays}d overdue</strong>
+                          </div>
+                        </div>
+                        <span className={`badge ${PRIORITY_BADGES[t.priority]}`}>{t.priority}</span>
+                      </div>
+                    );
+                  })}
+                  {tasks.filter(t => {
+                    if (!t.deadline || t.col === 3 || t.col === 4) return false;
+                    const d = new Date(t.deadline); d.setHours(0,0,0,0);
+                    const diff = Math.round((d.getTime() - new Date().getTime()) / 864e5);
+                    return diff >= 0 && diff <= 5;
+                  }).map(t => (
+                    <div className="overdue-item" key={t.id}>
+                      <span className="overdue-item-dot bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></span>
+                      <div className="flex-1">
+                        <div className="overdue-item-title font-semibold text-white">{t.title}</div>
+                        <div className="overdue-item-meta text-[10px] text-slate-400">
+                          {SCOPES[t.scope]} · {MEMBERS[t.assignee]} · Due soon
+                        </div>
+                      </div>
+                      <span className={`badge ${PRIORITY_BADGES[t.priority]}`}>{t.priority}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- 2. KANBAN BOARD --- */}
+        {activeTab === 'kanban' && (
+          <div className="page active">
+            <div className="top-bar">
+              <h2>Task Board</h2>
+              <div className="filters">
+                <button className={`fb ${assigneeFilter === 'all' ? 'active' : ''}`} onClick={() => setAssigneeFilter('all')}>All Assignees</button>
+                <button className={`fb ${assigneeFilter === 'T' ? 'active' : ''}`} onClick={() => setAssigneeFilter('T')}>Tiffany</button>
+                <button className={`fb ${assigneeFilter === 'M' ? 'active' : ''}`} onClick={() => setAssigneeFilter('M')}>Mercury</button>
+              </div>
+              <div className="filters pl-3 border-l border-white/10">
+                <button className={`fb ${scopeFilter === 'all' ? 'active' : ''}`} onClick={() => setScopeFilter('all')}>All Scopes</button>
+                {(['ae', 'si', 'da', 'pr'] as const).map(sc => (
+                  <button key={sc} className={`fb ${scopeFilter === sc ? 'active' : ''}`} onClick={() => setScopeFilter(sc)}>{SCOPES[sc]}</button>
+                ))}
+              </div>
+              <div className="search-wrap ml-auto">
+                <input 
+                  placeholder="🔍 Search tasks..." 
+                  value={searchQuery} 
+                  onChange={e => setSearchQuery(e.target.value)} 
+                />
+              </div>
+            </div>
+
+            {/* Micro Stats */}
+            <div className="stats">
+              <div className="sc">
+                <div className="n">{tasks.length}</div>
+                <div className="l">Total</div>
+              </div>
+              <div className="sc">
+                <div className="n text-amber-400">{tasks.filter(t => t.col === 1).length}</div>
+                <div className="l">In Progress</div>
+              </div>
+              <div className="sc">
+                <div className="n text-indigo-400">{tasks.filter(t => t.col === 2).length}</div>
+                <div className="l">Review</div>
+              </div>
+              <div className="sc">
+                <div className="n text-emerald-400">{tasks.filter(t => t.col === 3).length}</div>
+                <div className="l">Completed</div>
+              </div>
+              <div className="sc">
+                <div className="n text-rose-500">{tasks.filter(t => t.col === 4).length}</div>
+                <div className="l">Failed</div>
+              </div>
+              <div className="sc">
+                <div className="n text-red-400">
+                  {tasks.filter(t => {
+                    if (!t.deadline || t.col === 3 || t.col === 4) return false;
+                    const d = new Date(t.deadline); d.setHours(0,0,0,0);
+                    return d < new Date();
+                  }).length}
+                </div>
+                <div className="l">Overdue</div>
+              </div>
+            </div>
+
+            {/* Board Columns */}
+            <div className="board mt-2">
+              {COLS.map((colName, colIdx) => {
+                const filteredColTasks = tasks.filter(t => {
+                  const matchesAssignee = assigneeFilter === 'all' || t.assignee === assigneeFilter;
+                  const matchesScope = scopeFilter === 'all' || t.scope === scopeFilter;
+                  const matchesSearch = !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase());
+                  return t.col === colIdx && matchesAssignee && matchesScope && matchesSearch;
+                });
+
+                return (
+                  <div 
+                    className={`col ${colIdx === 4 ? 'col-failed' : ''}`} 
+                    key={colIdx}
+                    onDragOver={e => {
+                      e.preventDefault();
+                      e.currentTarget.querySelector('.tasks-area')?.classList.add('dov');
+                    }}
+                    onDragLeave={e => {
+                      e.currentTarget.querySelector('.tasks-area')?.classList.remove('dov');
+                    }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      e.currentTarget.querySelector('.tasks-area')?.classList.remove('dov');
+                      if (draggedTaskId !== null) {
+                        updateTaskField(draggedTaskId, 'col', colIdx);
+                        setDraggedTaskId(null);
+                      }
+                    }}
+                  >
+                    <div className="col-h">
+                      <span className="col-title">
+                        <span className="col-dot" style={{ background: COL_COLORS[colIdx], color: COL_COLORS[colIdx] }}></span>
+                        {colName}
+                      </span>
+                      <span className="col-cnt">{filteredColTasks.length}</span>
+                    </div>
+
+                    <div className="tasks-area">
+                      {filteredColTasks.map(task => (
+                        <div 
+                          className="task-card animate-fade-in" 
+                          key={task.id}
+                          draggable
+                          onDragStart={() => setDraggedTaskId(task.id)}
+                          onDragEnd={() => setDraggedTaskId(null)}
+                        >
+                          <div className="tc-actions">
+                            <button className="flex items-center gap-1 text-[9px]" onClick={() => handleOpenEditModal(task)}>
+                              <Edit2 size={8} /> Edit
+                            </button>
+                            <button className="btn-r flex items-center gap-1 text-[9px] px-2 py-0.5" onClick={() => handleDeleteTask(task.id)}>
+                              <Trash2 size={8} /> Del
+                            </button>
+                          </div>
+
+                          <div className="mb-2 flex flex-wrap gap-1">
+                            <span className={`badge s-${task.scope}`}>{SCOPES[task.scope]}</span>
+                            {task.subtype && <span className="text-[10px] text-slate-400 self-center">{task.subtype}</span>}
+                          </div>
+
+                          <div className="tc-title font-semibold">{task.title}</div>
+                          
+                          <div className="tc-meta">
+                            <span className={`badge ${PRIORITY_BADGES[task.priority]}`}>{task.priority}</span>
+                            <span className="av-tag">
+                              <span className={`av av-${task.assignee}`}>{task.assignee}</span>
+                              {MEMBERS[task.assignee]}
+                            </span>
+                          </div>
+
+                          {colIdx !== 4 ? (
+                            <div className="tc-pct">
+                              <div className="pct-bar">
+                                <div className="pct-fill" style={{ width: `${task.pct}%` }}></div>
+                              </div>
+                              <span className="pct-lbl font-semibold text-slate-400">{task.pct}%</span>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-rose-500 font-bold mt-2">✕ Failed / Rejected</div>
+                          )}
+
+                          {getDeadlineBadge(task.deadline, colIdx)}
+                          
+                          {task.note && (
+                            <div className="text-[10px] text-slate-400 mt-2 bg-slate-950/40 p-2 rounded border-l-2 border-indigo-500 italic">
+                              "{task.note}"
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {colIdx !== 4 && (
+                      <button className="add-btn hover:text-white" onClick={() => handleOpenAddModal(colIdx)}>
+                        <Plus size={12} /> Add task
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* --- 3. GANTT TIMELINE --- */}
+        {activeTab === 'timeline' && (
+          <div className="page active">
+            <div className="tl-controls">
+              <h2>Gantt Timeline</h2>
+              <div className="tl-scope-tabs">
+                <button className={`tl-tab ${timelineScopeFilter === 'all' ? 'active' : ''}`} onClick={() => setTimelineScopeFilter('all')}>All Scopes</button>
+                {(['ae', 'si', 'da', 'pr'] as const).map(sc => (
+                  <button key={sc} className={`tl-tab ${timelineScopeFilter === sc ? 'active' : ''}`} onClick={() => setTimelineScopeFilter(sc)}>{SCOPES[sc]}</button>
+                ))}
+              </div>
+              <div className="ml-auto flex gap-2">
+                <button onClick={() => handleShiftTimeline(-14)}><ChevronLeft size={12} /> 2w</button>
+                <button className="btn-p" onClick={() => handleShiftTimeline(0)}>Today</button>
+                <button onClick={() => handleShiftTimeline(14)}>2w <ChevronRight size={12} /></button>
+                <button className="btn-g" onClick={handleExportTimelineExcel}>
+                  <Download size={12} /> Export Excel
+                </button>
+              </div>
+            </div>
+
+            {/* Gantt Render */}
+            {(() => {
+              const today = new Date(); today.setHours(0,0,0,0);
+              const days = [];
+              for(let i=0; i<GANTT_DAYS; i++) {
+                const d = new Date(ganttStart);
+                d.setDate(ganttStart.getDate() + i);
+                days.push(d);
+              }
+
+              const months: { label: string; count: number }[] = [];
+              days.forEach(d => {
+                const label = d.toLocaleDateString('vi-VN', { month: 'short', year: 'numeric' });
+                if (!months.length || months[months.length - 1].label !== label) {
+                  months.push({ label, count: 1 });
+                } else {
+                  months[months.length - 1].count++;
+                }
+              });
+
+              const DAY_W = 24;
+              const LABEL_W = 220;
+              const totalW = LABEL_W + GANTT_DAYS * DAY_W;
+
+              const scopeOrder = ['ae', 'si', 'da', 'pr'] as const;
+              const activeScopes = timelineScopeFilter === 'all' ? scopeOrder : [timelineScopeFilter];
+              const timelineTasks = tasks.filter(t => activeScopes.includes(t.scope) && (t.start || t.deadline));
+
+              return (
+                <div className="gantt-container overflow-x-auto">
+                  <div style={{ minWidth: `${totalW}px` }}>
+                    {/* Header */}
+                    <div className="gantt-header" style={{ gridTemplateColumns: `${LABEL_W}px 1fr` }}>
+                      <div className="gantt-header-left font-bold text-slate-400">Tasks</div>
+                      <div>
+                        <div className="gantt-months">
+                          {months.map((m, i) => (
+                            <div className="gantt-month" style={{ width: `${m.count * DAY_W}px`, flexShrink: 0 }} key={i}>{m.label}</div>
+                          ))}
+                        </div>
+                        <div className="gantt-days">
+                          {days.map((d, i) => {
+                            const isToday = d.getTime() === today.getTime();
+                            const isWknd = d.getDay() === 0 || d.getDay() === 6;
+                            return (
+                              <div className={`gantt-day ${isToday ? 'today' : ''} ${isWknd ? 'weekend' : ''}`} style={{ width: `${DAY_W}px`, flexShrink: 0 }} key={i}>
+                                {d.getDate()}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Gantt Rows */}
+                    <div className="gantt-body">
+                      {activeScopes.map(sc => {
+                        const st = timelineTasks.filter(t => t.scope === sc);
+                        if (!st.length) return null;
+
+                        return (
+                          <React.Fragment key={sc}>
+                            <div className="gantt-scope-header" style={{ width: `${totalW}px` }}>
+                              <span className="w-2 h-2 rounded-full inline-block" style={{ background: SCOPE_CONFIGS[sc].color }}></span>
+                              <span className="font-bold text-xs uppercase tracking-wide">
+                                {SCOPES[sc]} &nbsp;·&nbsp; {sc === 'pr' ? 'MERCURY' : 'TIFFANY'} &nbsp;·&nbsp; {st.length} tasks
+                              </span>
+                            </div>
+
+                            {st.map(t => {
+                              const s = t.start ? new Date(t.start) : new Date(t.deadline); s.setHours(0,0,0,0);
+                              const e = t.deadline ? new Date(t.deadline) : s; e.setHours(0,0,0,0);
+                              
+                              const offsetDays = Math.round((s.getTime() - ganttStart.getTime()) / 864e5);
+                              const spanDays = Math.max(1, Math.round((e.getTime() - s.getTime()) / 864e5) + 1);
+                              
+                              const leftPx = offsetDays * DAY_W;
+                              const widthPx = spanDays * DAY_W - 2;
+                              const isVisible = leftPx < GANTT_DAYS * DAY_W && leftPx + widthPx > 0;
+                              
+                              const clampedLeft = Math.max(0, leftPx);
+                              const clampedW = Math.min(widthPx, GANTT_DAYS * DAY_W - clampedLeft);
+                              
+                              const isOverdue = e < today && t.col !== 3 && t.col !== 4;
+                              const barColor = t.col === 3 ? 'var(--color-success)' : t.col === 4 ? '#64748b' : isOverdue ? 'var(--color-danger)' : SCOPE_CONFIGS[sc]?.color || '#ccc';
+                              const progressW = Math.round((t.pct || 0) / 100 * clampedW);
+
+                              return (
+                                <div className="gantt-row" style={{ gridTemplateColumns: `${LABEL_W}px 1fr`, width: `${totalW}px` }} key={t.id}>
+                                  <div className="gantt-label">
+                                    <div className="gl-title font-semibold">{t.title}</div>
+                                    <div className="gl-sub">
+                                      <span className={`av av-${t.assignee}`}>{t.assignee}</span>
+                                      <span>{t.subtype || SCOPES[t.scope]}</span>
+                                      {t.col === 3 && <span className="text-emerald-400 font-semibold">✓ Done</span>}
+                                      {t.col === 4 && <span className="text-slate-400 font-semibold">✕ Reject</span>}
+                                      {isOverdue && <span className="text-rose-400 font-semibold">⚠ Overdue</span>}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="gantt-chart-area h-11 relative overflow-hidden">
+                                    {/* Grid columns background */}
+                                    {days.map((_, dayIdx) => (
+                                      <div 
+                                        className={`gantt-grid-line ${days[dayIdx].getTime() === today.getTime() ? 'today-line' : ''} ${days[dayIdx].getDay() === 0 || days[dayIdx].getDay() === 6 ? 'weekend-line' : ''}`}
+                                        style={{ left: `${dayIdx * DAY_W}px` }}
+                                        key={dayIdx}
+                                      />
+                                    ))}
+
+                                    {/* Gantt Bar */}
+                                    {isVisible && (
+                                      <div 
+                                        className="gantt-bar-g absolute top-1/2 -translate-y-1/2" 
+                                        style={{ left: `${clampedLeft}px`, width: `${clampedW}px`, background: barColor }}
+                                        onClick={() => handleOpenEditModal(t)}
+                                      >
+                                        <div className="gb-progress" style={{ width: `${progressW}px` }}></div>
+                                        <span className="gb-label relative z-10 truncate pl-1 font-bold text-[9px]">
+                                          {clampedW > 60 ? t.title : ''}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Timeline Legend */}
+            <div className="tl-legend mt-4">
+              <div className="text-[11px] font-bold text-slate-400 mr-2 uppercase">Legend:</div>
+              {(['ae', 'si', 'da', 'pr'] as const).map(sc => (
+                <div className="tl-legend-item" key={sc}>
+                  <div className="tl-legend-dot" style={{ background: SCOPE_CONFIGS[sc].color }}></div>
+                  {SCOPES[sc]}
+                </div>
+              ))}
+              <div className="tl-legend-item"><div className="tl-legend-dot bg-emerald-500"></div>Completed</div>
+              <div className="tl-legend-item"><div className="tl-legend-dot bg-rose-500"></div>Overdue</div>
+              <div className="tl-legend-item"><div className="tl-legend-dot bg-slate-500"></div>Rejected</div>
+              <div className="text-[10px] text-slate-400 italic ml-auto">Click on any bar to edit task directly</div>
+            </div>
+          </div>
+        )}
+
+        {/* --- 4. DAILY PROGRESS REPORT --- */}
+        {activeTab === 'daily' && (
+          <div className="page active" id="pg-daily">
+            <div className="daily-wrap">
+              <div className="daily-header">
+                <div>
+                  <h2>Daily Progress Report — Team IMPACT</h2>
+                  <div className="daily-date font-bold text-main" id="daily-date-label" style={{ color: 'var(--color-primary)' }}>
+                    {new Date(dailyDate).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </div>
+                </div>
+                <div className="flex gap-2 items-center no-print">
+                  <input 
+                    type="date" 
+                    value={dailyDate} 
+                    onChange={e => setDailyDate(e.target.value)} 
+                    className="daily-date-picker"
+                  />
+                  <button className="btn-g" onClick={handlePrintDaily}>
+                    <FileText size={12} /> Export PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Sections for each scope */}
+              {(['ae', 'si', 'da', 'pr'] as const).map(sc => {
+                const st = tasks.filter(t => t.scope === sc);
+                if (!st.length) return null;
+
+                return (
+                  <div className="daily-section mt-4" key={sc}>
+                    <div className="daily-section-h flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full" style={{ background: SCOPE_CONFIGS[sc].color }}></span>
+                      <span className="daily-section-title font-bold text-sm">{SCOPES[sc]}</span>
+                    </div>
+                    <table className="daily-table w-full text-left">
+                      <thead>
+                        <tr>
+                          <th className="p-4" style={{ width: '280px' }}>Task</th>
+                          <th className="p-4" style={{ width: '150px' }}>Sub-type</th>
+                          <th className="p-4" style={{ width: '120px' }}>Assignee</th>
+                          <th className="p-4 text-center" style={{ width: '100px' }}>% Done</th>
+                          <th className="p-4" style={{ width: '140px' }}>Status</th>
+                          <th className="p-4">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {st.map(t => (
+                          <tr key={t.id}>
+                            <td className="p-4 font-semibold">{t.title}</td>
+                            <td className="p-4 text-muted">{t.subtype || '—'}</td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-2">
+                                <span className={`av av-${t.assignee}`}>{t.assignee}</span>
+                                <span className="font-semibold">{MEMBERS[t.assignee]}</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-center">
+                              <input 
+                                type="number" 
+                                className="pct-input"
+                                min="0" 
+                                max="100" 
+                                value={t.pct} 
+                                onChange={e => updateTaskField(t.id, 'pct', e.target.value)} 
+                              />
+                            </td>
+                            <td className="p-4">
+                              <select 
+                                className="status-sel"
+                                value={t.col} 
+                                onChange={e => updateTaskField(t.id, 'col', e.target.value)}
+                              >
+                                {COLS.map((colName, idx) => (
+                                  <option value={idx} key={idx}>{colName}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="p-4">
+                              <input 
+                                className="note-input" 
+                                value={t.note || ''} 
+                                placeholder="Update progress notes..." 
+                                onChange={e => updateTaskField(t.id, 'note', e.target.value)} 
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+
+              {/* Summary */}
+              <div className="daily-summary mt-6">
+                <h3>Daily Summary Stats</h3>
+                <div className="summary-grid">
+                  <div className="sum-card">
+                    <div className="sn">{tasks.length}</div>
+                    <div className="sl text-muted">Total Tasks</div>
+                  </div>
+                  <div className="sum-card">
+                    <div className="sn text-success">{tasks.filter(t => t.col === 3).length}</div>
+                    <div className="sl text-muted">Completed</div>
+                  </div>
+                  <div className="sum-card">
+                    <div className="sn text-warning">{tasks.filter(t => t.col === 1).length}</div>
+                    <div className="sl text-muted">In Progress</div>
+                  </div>
+                  <div className="sum-card">
+                    <div className="sn text-main" style={{ color: 'var(--color-primary)' }}>
+                      {tasks.length ? Math.round(tasks.reduce((sum, t) => sum + t.pct, 0) / tasks.length) : 0}%
+                    </div>
+                    <div className="sl text-muted">Avg Progress</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- 5. WEEKLY REPORT --- */}
+        {activeTab === 'weekly' && (
+          <div className="page active" id="pg-weekly">
+            <div className="weekly-wrap">
+              <div className="weekly-header">
+                <h2>Weekly Report — Team IMPACT</h2>
+                <div className="weekly-to">
+                  Tuần từ <strong>{getWeeklyDateRange().mon.toLocaleDateString('vi-VN')}</strong> đến <strong>{getWeeklyDateRange().sun.toLocaleDateString('vi-VN')}</strong>
+                </div>
+              </div>
+
+              {/* Weekly content - KPIs by Scope */}
+              <div className="scope-kpi-grid mt-4">
+                {(['ae', 'si', 'da', 'pr'] as const).map(sc => {
+                  const st = tasks.filter(t => t.scope === sc);
+                  if (!st.length) return null;
+
+                  const pct = Math.round(st.reduce((sum, t) => sum + (t.pct || 0), 0) / st.length);
+                  const ov = st.filter(t => {
+                    if (!t.deadline || t.col === 3 || t.col === 4) return false;
+                    const d = new Date(t.deadline); d.setHours(0,0,0,0);
+                    return d < new Date();
+                  }).length;
+
+                  const isGood = pct >= 70;
+                  const isWarning = pct >= 40 && pct < 70;
+                  const statusLbl = isGood ? 'On Track' : isWarning ? 'At Risk' : 'Off Track';
+
+                  return (
+                    <div className="kpi-card" key={sc}>
+                      <div className="kpi-card-h">
+                        <span className="scope-name border-l-4 pl-2 font-bold" style={{ borderColor: SCOPE_CONFIGS[sc].color }}>{SCOPES[sc]}</span>
+                        <span className={`risk-badge ${isGood ? 'risk-on' : isWarning ? 'risk-at' : 'risk-off'}`}>{statusLbl}</span>
+                      </div>
+                      <div className="kpi-metrics">
+                        <div className="kpi-m"><div className="kv">{st.length}</div><div className="kl">Total</div></div>
+                        <div className="kpi-m"><div className="kv text-success">{st.filter(t => t.col === 3).length}</div><div className="kl">Done</div></div>
+                        <div className="kpi-m"><div className="kv text-danger">{ov}</div><div className="kl">Overdue</div></div>
+                      </div>
+                      <div className="scope-bar-wrap">
+                        <div className="scope-bar">
+                          <div className="scope-bar-fill" style={{ width: `${pct}%`, background: SCOPE_CONFIGS[sc].color }}></div>
+                        </div>
+                        <span className="scope-bar-pct font-bold">{pct}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Workload */}
+              <div className="workload-section">
+                <h3>Weekly Workload Summary</h3>
+                {(['T', 'M'] as const).map(m => {
+                  const mt = tasks.filter(t => t.assignee === m);
+                  const scArr = m === 'T' ? (['ae', 'si', 'da'] as const) : (['pr'] as const);
+
+                  return (
+                    <div className="member-row" key={m}>
+                      <div className="member-info">
+                        <span className={`av av-${m} w-8 h-8 font-bold`}>{m}</span>
+                        <div>
+                          <div className="member-name font-bold">{MEMBERS[m]}</div>
+                          <div className="member-role text-[10px] text-muted">{ROLES[m]}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-4 mr-6 shrink-0 text-center">
+                        <div>
+                          <div className="text-base font-bold text-main">{mt.length}</div>
+                          <div className="text-[9px] uppercase tracking-wide text-muted">tasks</div>
+                        </div>
+                        <div>
+                          <div className="text-base font-bold text-success">{mt.filter(t => t.col === 3).length}</div>
+                          <div className="text-[9px] uppercase tracking-wide text-muted">done</div>
+                        </div>
+                        <div>
+                          <div className="text-base font-bold text-warning">{mt.filter(t => t.col === 1).length}</div>
+                          <div className="text-[9px] uppercase tracking-wide text-muted">active</div>
+                        </div>
+                      </div>
+
+                      <div className="wl-bars">
+                        {scArr.map(sc => {
+                          const st = mt.filter(t => t.scope === sc);
+                          const pct = st.length ? Math.round(st.reduce((sum, t) => sum + (t.pct || 0), 0) / st.length) : 0;
+                          return (
+                            <div className="wl-row" key={sc}>
+                              <span className="wl-label font-bold text-muted">{SCOPES[sc].split(' ')[0]}</span>
+                              <div className="wl-bar">
+                                <div className="wl-fill" style={{ width: `${pct}%`, background: SCOPE_CONFIGS[sc].color }}></div>
+                              </div>
+                              <span className="wl-pct">{pct}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Highlights & Attention */}
+              {(() => {
+                const overdue = tasks.filter(t => {
+                  if (!t.deadline || t.col === 3 || t.col === 4) return false;
+                  const d = new Date(t.deadline); d.setHours(0,0,0,0);
+                  return d < new Date();
+                });
+                const hi = tasks.filter(t => t.priority === 'high' && t.col !== 3 && t.col !== 4);
+
+                if (!overdue.length && !hi.length) return null;
+
+                return (
+                  <div className="highlight-box">
+                    <h4>⚠ Items Needing Attention — Escalated for SUNNY</h4>
+                    <ul>
+                      {overdue.map(t => (
+                        <li key={t.id}><strong>[OVERDUE]</strong> {t.title} — {SCOPES[t.scope]} ({MEMBERS[t.assignee]})</li>
+                      ))}
+                      {hi.slice(0, 4).map(t => (
+                        <li key={t.id}><strong>[HIGH PRIORITY]</strong> {t.title} — {t.pct || 0}% done, deadline: {t.deadline || 'TBD'}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
+
+              {/* Next Week Focus */}
+              <div className="panel mt-4 no-print">
+                <h3 className="mb-2">Next Week Focus & Notes</h3>
+                <textarea 
+                  className="weekly-note" 
+                  placeholder="Ghi chú định hướng tuần tới, rủi ro cần escalate..."
+                  value={weeklyNote}
+                  onChange={e => setWeeklyNote(e.target.value)}
+                />
+              </div>
+
+              {/* PDF Print trigger */}
+              <div className="flex justify-end mt-4 no-print">
+                <button className="btn-g" onClick={handlePrintWeekly}>
+                  <FileText size={12} /> Export PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* --- TASK ADD/EDIT MODAL --- */}
+      {isModalOpen && (
+        <div className="modal-bg show">
+        <div className="modal">
+          <h3>
+            <span>{editId !== null ? 'Edit Task' : 'Add New Task'}</span>
+            <button type="button" className="bg-transparent border-none text-slate-400 hover:text-slate-200 p-1" onClick={closeModal}>
+              <X size={16} />
+            </button>
+          </h3>
+          
+          <form onSubmit={handleSaveTask}>
+            <div className="fg">
+              <label>Title *</label>
+              <input 
+                value={taskForm.title} 
+                onChange={e => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Task title..." 
+                required
+              />
+            </div>
+            
+            <div className="fg">
+              <label>Description</label>
+              <textarea 
+                value={taskForm.desc} 
+                onChange={e => setTaskForm(prev => ({ ...prev, desc: e.target.value }))}
+                placeholder="Brief description..." 
+              />
+            </div>
+
+            <div className="fg-row">
+              <div className="fg">
+                <label>Scope *</label>
+                <select 
+                  value={taskForm.scope}
+                  onChange={e => {
+                    const newScope = e.target.value as 'ae' | 'si' | 'da' | 'pr';
+                    setTaskForm(prev => ({ 
+                      ...prev, 
+                      scope: newScope, 
+                      subtype: subtypes[newScope][0] || '' 
+                    }));
+                  }}
+                >
+                  <option value="ae">Activation & Event</option>
+                  <option value="si">Social & Influencers</option>
+                  <option value="da">Data & AI</option>
+                  <option value="pr">Production</option>
+                </select>
+              </div>
+
+              <div className="fg">
+                <label>Sub-type</label>
+                {!isAddingSubtype ? (
+                  <>
+                    <select 
+                      value={taskForm.subtype}
+                      onChange={e => setTaskForm(prev => ({ ...prev, subtype: e.target.value }))}
+                    >
+                      <option value="">— Select —</option>
+                      {subtypes[taskForm.scope].map(st => (
+                        <option value={st} key={st}>{st}</option>
+                      ))}
+                    </select>
+                    
+                    <button 
+                      type="button" 
+                      className="btn-add-custom-subtype"
+                      onClick={() => setIsAddingSubtype(true)}
+                    >
+                      + Add custom sub-type
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex gap-2">
+                    <input 
+                      placeholder="New subtype name..." 
+                      value={newSubtypeInput}
+                      onChange={e => setNewSubtypeInput(e.target.value)}
+                      className="flex-1"
+                    />
+                    <button 
+                      type="button" 
+                      className="btn-p py-1 px-3 border-none font-bold"
+                      onClick={handleAddSubtype}
+                    >
+                      +
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn-cancel-subtype"
+                      onClick={() => setIsAddingSubtype(false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Subtype list management */}
+            <div className="fg mt-2">
+              <label>Subtypes List Management</label>
+              <div className="subtype-list">
+                {subtypes[taskForm.scope].map(st => (
+                  <div className="subtype-item" key={st}>
+                    <span>{st}</span>
+                    <button 
+                      type="button" 
+                      className="text-red-400 border-none bg-transparent hover:text-red-300 font-bold text-xs"
+                      onClick={() => handleRemoveSubtype(taskForm.scope, st)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="fg-row">
+              <div className="fg">
+                <label>Assignee</label>
+                <select 
+                  value={taskForm.assignee}
+                  onChange={e => setTaskForm(prev => ({ ...prev, assignee: e.target.value as 'T' | 'M' }))}
+                >
+                  <option value="T">TIFFANY</option>
+                  <option value="M">MERCURY</option>
+                </select>
+              </div>
+              <div className="fg">
+                <label>Priority</label>
+                <select 
+                  value={taskForm.priority}
+                  onChange={e => setTaskForm(prev => ({ ...prev, priority: e.target.value as 'high' | 'med' | 'low' }))}
+                >
+                  <option value="high">High</option>
+                  <option value="med">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="fg-row">
+              <div className="fg">
+                <label>Start Date</label>
+                <input 
+                  type="date" 
+                  value={taskForm.start} 
+                  onChange={e => setTaskForm(prev => ({ ...prev, start: e.target.value }))}
+                />
+              </div>
+              <div className="fg">
+                <label>Deadline</label>
+                <input 
+                  type="date" 
+                  value={taskForm.deadline} 
+                  onChange={e => setTaskForm(prev => ({ ...prev, deadline: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="fg-row">
+              <div className="fg">
+                <label>% Complete</label>
+                <input 
+                  type="number" 
+                  min="0" 
+                  max="100" 
+                  value={taskForm.pct} 
+                  onChange={e => setTaskForm(prev => ({ ...prev, pct: Math.min(100, Math.max(0, +e.target.value || 0)) }))}
+                />
+              </div>
+              <div className="fg">
+                <label>Status</label>
+                <select 
+                  value={taskForm.col}
+                  onChange={e => setTaskForm(prev => ({ ...prev, col: +e.target.value }))}
+                >
+                  {COLS.map((colName, idx) => (
+                    <option value={idx} key={idx}>{colName}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="fg">
+              <label>Progress Note</label>
+              <textarea 
+                value={taskForm.note} 
+                onChange={e => setTaskForm(prev => ({ ...prev, note: e.target.value }))}
+                placeholder="Ghi chú tiến độ..." 
+                className="min-h-16"
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="hover:text-slate-300" onClick={closeModal}>Cancel</button>
+              <button type="submit" className="btn-p">{editId !== null ? 'Save Changes' : 'Add Task'}</button>
+            </div>
+          </form>
+        </div>
+        </div>
+      )}
+    </div>
+  );
+}
