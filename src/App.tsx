@@ -19,7 +19,8 @@ import {
   ChevronRight,
   Sparkles,
   Sun,
-  Moon
+  Moon,
+  Link as LinkIcon
 } from 'lucide-react';
 
 // Interfaces
@@ -29,13 +30,22 @@ interface Task {
   desc: string;
   scope: 'ae' | 'si' | 'da' | 'pr';
   subtype: string;
-  assignee: 'T' | 'M';
+  assignee: string;
   priority: 'high' | 'med' | 'low';
   col: number; // 0: Backlog, 1: In Progress, 2: Review, 3: Done, 4: Failed/Reject
   start: string;
   deadline: string;
   pct: number;
   note: string;
+  link?: string;
+}
+
+interface Member {
+  id: string;
+  name: string;
+  role: string;
+  color: string;
+  removable?: boolean;
 }
 
 interface ScopeConfig {
@@ -48,8 +58,24 @@ interface ScopeConfig {
 
 // Constant Constants
 const COLS = ['Backlog', 'In Progress', 'Review', 'Done', 'Failed / Reject'];
-const MEMBERS = { T: 'TIFFANY', M: 'MERCURY' };
-const ROLES = { T: 'Senior — Host Lead', M: 'Production Executive' };
+// Only the Host Lead (id 'T') is a locked default; everyone else is editable/removable.
+const LOCKED_MEMBER_ID = 'T';
+const DEFAULT_MEMBERS: Member[] = [
+  { id: 'T', name: 'TIFFANY', role: 'Senior — Host Lead', color: 'linear-gradient(135deg, #818cf8, #4f46e5)', removable: false },
+  { id: 'M', name: 'MERCURY', role: 'Production Executive', color: 'linear-gradient(135deg, #f43f5e, #be123c)', removable: true },
+];
+
+// Preset gradient palette for new member avatars
+const MEMBER_COLORS = [
+  'linear-gradient(135deg, #818cf8, #4f46e5)',
+  'linear-gradient(135deg, #f43f5e, #be123c)',
+  'linear-gradient(135deg, #34d399, #059669)',
+  'linear-gradient(135deg, #fbbf24, #d97706)',
+  'linear-gradient(135deg, #22d3ee, #0891b2)',
+  'linear-gradient(135deg, #f472b6, #db2777)',
+  'linear-gradient(135deg, #c084fc, #7c3aed)',
+  'linear-gradient(135deg, #94a3b8, #475569)',
+];
 const SCOPES: Record<'ae' | 'si' | 'da' | 'pr', string> = {
   ae: 'Activation & Event',
   si: 'Social & Influencers',
@@ -150,6 +176,29 @@ export default function App() {
     return defaultSubtypes;
   });
 
+  const [members, setMembers] = useState<Member[]>(() => {
+    try {
+      const saved = localStorage.getItem('impact_members');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Migration: only the Host Lead is locked; everyone else is editable/removable.
+          return parsed.map((m: Member) => ({ ...m, removable: m.id !== LOCKED_MEMBER_ID }));
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_MEMBERS;
+  });
+
+  // Member lookup helpers
+  const memberById = (id: string) => members.find(m => m.id === id);
+  const memberName = (id: string) => memberById(id)?.name ?? id;
+  const memberRole = (id: string) => memberById(id)?.role ?? '';
+  const memberColor = (id: string) => memberById(id)?.color ?? 'linear-gradient(135deg, #94a3b8, #475569)';
+  const memberInitial = (id: string) => (memberById(id)?.name ?? id).trim().charAt(0).toUpperCase() || '?';
+
   const [activeTab, setActiveTab] = useState<'dash' | 'kanban' | 'timeline' | 'daily' | 'weekly'>('dash');
 
   const [darkMode, setDarkMode] = useState(() => {
@@ -176,7 +225,7 @@ export default function App() {
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [assigneeFilter, setAssigneeFilter] = useState<'all' | 'T' | 'M'>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [scopeFilter, setScopeFilter] = useState<'all' | 'ae' | 'si' | 'da' | 'pr'>('all');
   const [timelineScopeFilter, setTimelineScopeFilter] = useState<'all' | 'ae' | 'si' | 'da' | 'pr'>('all');
 
@@ -204,12 +253,22 @@ export default function App() {
     start: '',
     deadline: '',
     pct: 0,
-    note: ''
+    note: '',
+    link: ''
   });
 
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
   const [newSubtypeInput, setNewSubtypeInput] = useState('');
   const [isAddingSubtype, setIsAddingSubtype] = useState(false);
+
+  // Member management modal
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [memberForm, setMemberForm] = useState<{ name: string; role: string; color: string }>({
+    name: '',
+    role: '',
+    color: MEMBER_COLORS[2],
+  });
 
   // --- Effects ---
   useEffect(() => {
@@ -219,6 +278,78 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('impact_subtypes', JSON.stringify(subtypes));
   }, [subtypes]);
+
+  useEffect(() => {
+    localStorage.setItem('impact_members', JSON.stringify(members));
+  }, [members]);
+
+  // --- Member Management ---
+  const resetMemberForm = () => {
+    const used = new Set(members.map(m => m.color));
+    const nextColor = MEMBER_COLORS.find(c => !used.has(c)) || MEMBER_COLORS[members.length % MEMBER_COLORS.length];
+    setEditingMemberId(null);
+    setMemberForm({ name: '', role: '', color: nextColor });
+  };
+
+  const openMemberModal = () => {
+    resetMemberForm();
+    setIsMemberModalOpen(true);
+  };
+
+  const startEditMember = (mem: Member) => {
+    setEditingMemberId(mem.id);
+    setMemberForm({ name: mem.name, role: mem.role, color: mem.color });
+  };
+
+  const handleAddMember = () => {
+    const name = memberForm.name.trim();
+    if (!name) return alert('Vui lòng nhập tên thành viên.');
+    // Build a unique id from the first letter, falling back to suffixes
+    const base = name.charAt(0).toUpperCase();
+    let id = base;
+    let n = 2;
+    while (members.some(m => m.id === id)) {
+      id = base + n;
+      n++;
+    }
+    setMembers(prev => [...prev, { id, name, role: memberForm.role.trim(), color: memberForm.color, removable: true }]);
+    resetMemberForm();
+  };
+
+  const handleUpdateMember = () => {
+    if (!editingMemberId) return;
+    const name = memberForm.name.trim();
+    if (!name) return alert('Vui lòng nhập tên thành viên.');
+    setMembers(prev => prev.map(m =>
+      m.id === editingMemberId
+        ? { ...m, name, role: memberForm.role.trim(), color: memberForm.color }
+        : m
+    ));
+    resetMemberForm();
+  };
+
+  const handleSubmitMember = () => {
+    if (editingMemberId) handleUpdateMember();
+    else handleAddMember();
+  };
+
+  const handleDeleteMember = (id: string) => {
+    const target = memberById(id);
+    if (!target || target.removable === false) return;
+    const remaining = members.filter(m => m.id !== id);
+    const fallback = remaining[0]?.id ?? '';
+    const assignedCount = tasks.filter(t => t.assignee === id).length;
+    const msg = assignedCount > 0
+      ? `Xóa "${target.name}"? ${assignedCount} task sẽ được chuyển sang "${memberName(fallback)}".`
+      : `Xóa "${target.name}"?`;
+    if (!confirm(msg)) return;
+    if (assignedCount > 0 && fallback) {
+      setTasks(prev => prev.map(t => t.assignee === id ? { ...t, assignee: fallback } : t));
+    }
+    if (assigneeFilter === id) setAssigneeFilter('all');
+    if (editingMemberId === id) resetMemberForm();
+    setMembers(remaining);
+  };
 
   // --- Helpers ---
   const handleOpenAddModal = (colIndex: number) => {
@@ -234,7 +365,8 @@ export default function App() {
       start: '',
       deadline: '',
       pct: 0,
-      note: ''
+      note: '',
+      link: ''
     });
     setIsAddingSubtype(false);
     setNewSubtypeInput('');
@@ -344,7 +476,7 @@ export default function App() {
     const rows = tasks.filter(t => t.start || t.deadline).map(t => ({
       'Scope': SCOPES[t.scope],
       'Task': t.title,
-      'Assignee': MEMBERS[t.assignee],
+      'Assignee': memberName(t.assignee),
       'Sub-type': t.subtype || '',
       'Priority': t.priority.toUpperCase(),
       'Start date': t.start || '',
@@ -537,15 +669,17 @@ export default function App() {
               <div className="panel">
                 <h3>Member Workload</h3>
                 <div className="flex flex-col">
-                  {(['T', 'M'] as const).map(m => {
+                  {members.map(mem => {
+                    const m = mem.id;
                     const mt = tasks.filter(t => t.assignee === m);
-                    const scArr = m === 'T' ? (['ae', 'si', 'da'] as const) : (['pr'] as const);
+                    const matched = (['ae', 'si', 'da', 'pr'] as const).filter(sc => mt.some(t => t.scope === sc));
+                    const scArr = matched.length ? matched : (['ae', 'si', 'da', 'pr'] as const);
                     return (
                       <div className="member-load" key={m}>
-                        <div className={`av av-${m} w-8 h-8 text-xs font-bold`}>{m}</div>
+                        <div className="av w-8 h-8 text-xs font-bold" style={{ background: mem.color, color: '#fff' }}>{memberInitial(m)}</div>
                         <div className="ml-info">
-                          <div className="ml-name">{MEMBERS[m]}</div>
-                          <div className="ml-role">{ROLES[m]} · {mt.length} tasks</div>
+                          <div className="ml-name">{mem.name}</div>
+                          <div className="ml-role">{mem.role} · {mt.length} tasks</div>
                         </div>
                         <div className="ml-bar-wrap">
                           {scArr.map(sc => {
@@ -586,7 +720,7 @@ export default function App() {
                         <div className="flex-1">
                           <div className="overdue-item-title font-semibold text-white">{t.title}</div>
                           <div className="overdue-item-meta text-[10px] text-slate-400">
-                            {SCOPES[t.scope]} · {MEMBERS[t.assignee]} · <strong className="text-rose-400">{diffDays}d overdue</strong>
+                            {SCOPES[t.scope]} · {memberName(t.assignee)} · <strong className="text-rose-400">{diffDays}d overdue</strong>
                           </div>
                         </div>
                         <span className={`badge ${PRIORITY_BADGES[t.priority]}`}>{t.priority}</span>
@@ -604,7 +738,7 @@ export default function App() {
                       <div className="flex-1">
                         <div className="overdue-item-title font-semibold text-white">{t.title}</div>
                         <div className="overdue-item-meta text-[10px] text-slate-400">
-                          {SCOPES[t.scope]} · {MEMBERS[t.assignee]} · Due soon
+                          {SCOPES[t.scope]} · {memberName(t.assignee)} · Due soon
                         </div>
                       </div>
                       <span className={`badge ${PRIORITY_BADGES[t.priority]}`}>{t.priority}</span>
@@ -623,8 +757,19 @@ export default function App() {
               <h2>Task Board</h2>
               <div className="filters">
                 <button className={`fb ${assigneeFilter === 'all' ? 'active' : ''}`} onClick={() => setAssigneeFilter('all')}>All Assignees</button>
-                <button className={`fb ${assigneeFilter === 'T' ? 'active' : ''}`} onClick={() => setAssigneeFilter('T')}>Tiffany</button>
-                <button className={`fb ${assigneeFilter === 'M' ? 'active' : ''}`} onClick={() => setAssigneeFilter('M')}>Mercury</button>
+                {members.map(mem => (
+                  <button
+                    key={mem.id}
+                    className={`fb fb-member ${assigneeFilter === mem.id ? 'active' : ''}`}
+                    onClick={() => setAssigneeFilter(mem.id)}
+                  >
+                    <span className="fb-dot" style={{ background: mem.color }}></span>
+                    {mem.name.charAt(0) + mem.name.slice(1).toLowerCase()}
+                  </button>
+                ))}
+                <button className="fb fb-add" onClick={openMemberModal} title="Thêm thành viên">
+                  <Plus size={12} />
+                </button>
               </div>
               <div className="filters pl-3 border-l border-white/10">
                 <button className={`fb ${scopeFilter === 'all' ? 'active' : ''}`} onClick={() => setScopeFilter('all')}>All Scopes</button>
@@ -741,8 +886,8 @@ export default function App() {
                           <div className="tc-meta">
                             <span className={`badge ${PRIORITY_BADGES[task.priority]}`}>{task.priority}</span>
                             <span className="av-tag">
-                              <span className={`av av-${task.assignee}`}>{task.assignee}</span>
-                              {MEMBERS[task.assignee]}
+                              <span className="av" style={{ background: memberColor(task.assignee), color: '#fff' }}>{memberInitial(task.assignee)}</span>
+                              {memberName(task.assignee)}
                             </span>
                           </div>
 
@@ -758,7 +903,20 @@ export default function App() {
                           )}
 
                           {getDeadlineBadge(task.deadline, colIdx)}
-                          
+
+                          {task.link && (
+                            <a
+                              className="tc-link"
+                              href={task.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <LinkIcon size={10} />
+                              <span className="tc-link-text">{task.link.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                            </a>
+                          )}
+
                           {task.note && (
                             <div className="text-[10px] text-slate-400 mt-2 bg-slate-950/40 p-2 rounded border-l-2 border-indigo-500 italic">
                               "{task.note}"
@@ -893,7 +1051,7 @@ export default function App() {
                                   <div className="gantt-label">
                                     <div className="gl-title font-semibold">{t.title}</div>
                                     <div className="gl-sub">
-                                      <span className={`av av-${t.assignee}`}>{t.assignee}</span>
+                                      <span className="av" style={{ background: memberColor(t.assignee), color: '#fff' }}>{memberInitial(t.assignee)}</span>
                                       <span>{t.subtype || SCOPES[t.scope]}</span>
                                       {t.col === 3 && <span className="text-emerald-400 font-semibold">✓ Done</span>}
                                       {t.col === 4 && <span className="text-slate-400 font-semibold">✕ Reject</span>}
@@ -1007,8 +1165,8 @@ export default function App() {
                             <td className="p-4 text-muted">{t.subtype || '—'}</td>
                             <td className="p-4">
                               <div className="flex items-center gap-2">
-                                <span className={`av av-${t.assignee}`}>{t.assignee}</span>
-                                <span className="font-semibold">{MEMBERS[t.assignee]}</span>
+                                <span className="av" style={{ background: memberColor(t.assignee), color: '#fff' }}>{memberInitial(t.assignee)}</span>
+                                <span className="font-semibold">{memberName(t.assignee)}</span>
                               </div>
                             </td>
                             <td className="p-4 text-center">
@@ -1033,11 +1191,12 @@ export default function App() {
                               </select>
                             </td>
                             <td className="p-4">
-                              <input 
-                                className="note-input" 
-                                value={t.note || ''} 
-                                placeholder="Update progress notes..." 
-                                onChange={e => updateTaskField(t.id, 'note', e.target.value)} 
+                              <textarea
+                                className="note-input"
+                                rows={2}
+                                value={t.note || ''}
+                                placeholder="Update progress notes..."
+                                onChange={e => updateTaskField(t.id, 'note', e.target.value)}
                               />
                             </td>
                           </tr>
@@ -1129,17 +1288,19 @@ export default function App() {
               {/* Workload */}
               <div className="workload-section">
                 <h3>Weekly Workload Summary</h3>
-                {(['T', 'M'] as const).map(m => {
+                {members.map(mem => {
+                  const m = mem.id;
                   const mt = tasks.filter(t => t.assignee === m);
-                  const scArr = m === 'T' ? (['ae', 'si', 'da'] as const) : (['pr'] as const);
+                  const matched = (['ae', 'si', 'da', 'pr'] as const).filter(sc => mt.some(t => t.scope === sc));
+                  const scArr = matched.length ? matched : (['ae', 'si', 'da', 'pr'] as const);
 
                   return (
                     <div className="member-row" key={m}>
                       <div className="member-info">
-                        <span className={`av av-${m} w-8 h-8 font-bold`}>{m}</span>
+                        <span className="av w-8 h-8 font-bold" style={{ background: mem.color, color: '#fff' }}>{memberInitial(m)}</span>
                         <div>
-                          <div className="member-name font-bold">{MEMBERS[m]}</div>
-                          <div className="member-role text-[10px] text-muted">{ROLES[m]}</div>
+                          <div className="member-name font-bold">{mem.name}</div>
+                          <div className="member-role text-[10px] text-muted">{mem.role}</div>
                         </div>
                       </div>
                       
@@ -1194,7 +1355,7 @@ export default function App() {
                     <h4>⚠ Items Needing Attention — Escalated for SUNNY</h4>
                     <ul>
                       {overdue.map(t => (
-                        <li key={t.id}><strong>[OVERDUE]</strong> {t.title} — {SCOPES[t.scope]} ({MEMBERS[t.assignee]})</li>
+                        <li key={t.id}><strong>[OVERDUE]</strong> {t.title} — {SCOPES[t.scope]} ({memberName(t.assignee)})</li>
                       ))}
                       {hi.slice(0, 4).map(t => (
                         <li key={t.id}><strong>[HIGH PRIORITY]</strong> {t.title} — {t.pct || 0}% done, deadline: {t.deadline || 'TBD'}</li>
@@ -1250,10 +1411,20 @@ export default function App() {
             
             <div className="fg">
               <label>Description</label>
-              <textarea 
-                value={taskForm.desc} 
+              <textarea
+                value={taskForm.desc}
                 onChange={e => setTaskForm(prev => ({ ...prev, desc: e.target.value }))}
-                placeholder="Brief description..." 
+                placeholder="Brief description..."
+              />
+            </div>
+
+            <div className="fg">
+              <label>Link / Đường dẫn liên kết</label>
+              <input
+                type="url"
+                value={taskForm.link || ''}
+                onChange={e => setTaskForm(prev => ({ ...prev, link: e.target.value }))}
+                placeholder="https://..."
               />
             </div>
 
@@ -1349,12 +1520,13 @@ export default function App() {
             <div className="fg-row">
               <div className="fg">
                 <label>Assignee</label>
-                <select 
+                <select
                   value={taskForm.assignee}
-                  onChange={e => setTaskForm(prev => ({ ...prev, assignee: e.target.value as 'T' | 'M' }))}
+                  onChange={e => setTaskForm(prev => ({ ...prev, assignee: e.target.value }))}
                 >
-                  <option value="T">TIFFANY</option>
-                  <option value="M">MERCURY</option>
+                  {members.map(mem => (
+                    <option value={mem.id} key={mem.id}>{mem.name}</option>
+                  ))}
                 </select>
               </div>
               <div className="fg">
@@ -1429,6 +1601,105 @@ export default function App() {
             </div>
           </form>
         </div>
+        </div>
+      )}
+
+      {isMemberModalOpen && (
+        <div className="modal-bg show">
+          <div className="modal modal-sm">
+            <h3>
+              <span>{editingMemberId ? `Sửa: ${memberName(editingMemberId)}` : 'Quản lý thành viên'}</span>
+              <button type="button" className="bg-transparent border-none text-slate-400 hover:text-slate-200 p-1" onClick={() => { resetMemberForm(); setIsMemberModalOpen(false); }}>
+                <X size={16} />
+              </button>
+            </h3>
+
+            <div className="fg">
+              <label>Tên thành viên *</label>
+              <input
+                value={memberForm.name}
+                onChange={e => setMemberForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="VD: Jupiter"
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmitMember(); } }}
+              />
+            </div>
+
+            <div className="fg">
+              <label>Vai trò (role)</label>
+              <input
+                value={memberForm.role}
+                onChange={e => setMemberForm(prev => ({ ...prev, role: e.target.value }))}
+                placeholder="VD: Creative Lead"
+              />
+            </div>
+
+            <div className="fg">
+              <label>Màu avatar</label>
+              <div className="color-swatches">
+                {MEMBER_COLORS.map(c => (
+                  <button
+                    type="button"
+                    key={c}
+                    className={`color-swatch ${memberForm.color === c ? 'selected' : ''}`}
+                    style={{ background: c }}
+                    onClick={() => setMemberForm(prev => ({ ...prev, color: c }))}
+                  >
+                    {memberForm.name.trim().charAt(0).toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              {editingMemberId && (
+                <button type="button" onClick={resetMemberForm}>Hủy</button>
+              )}
+              <button type="button" className="btn-p" onClick={handleSubmitMember}>
+                {editingMemberId ? <><Check size={14} /> Lưu thay đổi</> : <><Plus size={14} /> Thêm thành viên</>}
+              </button>
+            </div>
+
+            <div className="fg mt-2">
+              <label>Danh sách thành viên</label>
+              <div className="subtype-list">
+                {members.map(mem => (
+                  <div className={`subtype-item member-item ${editingMemberId === mem.id ? 'editing' : ''}`} key={mem.id}>
+                    <span className="flex items-center gap-2">
+                      <span className="av" style={{ background: mem.color, color: '#fff' }}>{memberInitial(mem.id)}</span>
+                      <span className="font-semibold">{mem.name}</span>
+                      {mem.role && <span className="text-[10px] text-muted">· {mem.role}</span>}
+                    </span>
+                    <span className="member-item-actions flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="text-slate-400 hover:text-indigo-400 border-none bg-transparent"
+                        title="Sửa"
+                        onClick={() => startEditMember(mem)}
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                      {mem.removable === false ? (
+                        <span className="text-[10px] text-muted">Host Lead</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="text-red-400 border-none bg-transparent hover:text-red-300 font-bold text-xs"
+                          title="Xóa"
+                          onClick={() => handleDeleteMember(mem.id)}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" onClick={() => { resetMemberForm(); setIsMemberModalOpen(false); }}>Đóng</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
