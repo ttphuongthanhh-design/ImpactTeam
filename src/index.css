@@ -1636,3 +1636,73 @@ button:active {
   outline: none;
 }
 
+/* ============================================================
+   LIGHT MODE OVERRIDES
+   The JSX uses hard-coded dark Tailwind utilities (bg-*-950,
+   text-*-400, text-white, etc.) that were designed for dark
+   mode only. In light mode these produce dark "bubble"
+   backgrounds and washed-out / invisible text. The rules below
+   remap those utilities to readable light-mode equivalents.
+   They only apply when .dark is NOT present, so dark mode is
+   untouched. (These are unlayered, so they win over Tailwind's
+   layered utilities.)
+   ============================================================ */
+
+/* --- Badge / pill "bubble" backgrounds (tinted, not dark) --- */
+html:not(.dark) .bg-violet-950\/40 { background-color: rgba(139, 92, 246, 0.1) !important; }
+html:not(.dark) .bg-pink-950\/40   { background-color: rgba(236, 72, 153, 0.1) !important; }
+html:not(.dark) .bg-cyan-950\/40   { background-color: rgba(6, 182, 212, 0.1) !important; }
+html:not(.dark) .bg-rose-950\/40   { background-color: rgba(244, 63, 94, 0.1) !important; }
+html:not(.dark) .bg-red-950\/40    { background-color: rgba(239, 68, 68, 0.1) !important; }
+html:not(.dark) .bg-amber-950\/40  { background-color: rgba(245, 158, 11, 0.1) !important; }
+html:not(.dark) .bg-blue-950\/40   { background-color: rgba(59, 130, 246, 0.1) !important; }
+
+html:not(.dark) .bg-red-950\/20     { background-color: rgba(239, 68, 68, 0.08) !important; }
+html:not(.dark) .bg-amber-950\/20   { background-color: rgba(245, 158, 11, 0.08) !important; }
+html:not(.dark) .bg-emerald-950\/20 { background-color: rgba(16, 185, 129, 0.08) !important; }
+html:not(.dark) .bg-rose-950\/20    { background-color: rgba(244, 63, 94, 0.08) !important; }
+html:not(.dark) .bg-slate-950\/40   { background-color: rgba(15, 23, 42, 0.04) !important; }
+
+/* --- Badge / pill borders (lighter tint) --- */
+html:not(.dark) .border-violet-800\/30 { border-color: rgba(139, 92, 246, 0.2) !important; }
+html:not(.dark) .border-pink-800\/30   { border-color: rgba(236, 72, 153, 0.2) !important; }
+html:not(.dark) .border-cyan-800\/30   { border-color: rgba(6, 182, 212, 0.2) !important; }
+html:not(.dark) .border-rose-800\/30   { border-color: rgba(244, 63, 94, 0.2) !important; }
+html:not(.dark) .border-red-800\/30    { border-color: rgba(239, 68, 68, 0.2) !important; }
+html:not(.dark) .border-amber-800\/30  { border-color: rgba(245, 158, 11, 0.2) !important; }
+html:not(.dark) .border-blue-800\/30   { border-color: rgba(59, 130, 246, 0.2) !important; }
+html:not(.dark) .border-red-900\/30    { border-color: rgba(239, 68, 68, 0.2) !important; }
+html:not(.dark) .border-amber-900\/30  { border-color: rgba(245, 158, 11, 0.2) !important; }
+
+/* --- Muted / neutral text (dark gray that is readable on light) --- */
+html:not(.dark) .text-slate-400 { color: #64748b !important; }
+html:not(.dark) .text-slate-300 { color: #475569 !important; }
+html:not(.dark) .text-slate-200 { color: #334155 !important; }
+html:not(.dark) .hover\:text-slate-300:hover { color: #475569 !important; }
+html:not(.dark) .hover\:text-slate-200:hover { color: #334155 !important; }
+
+/* The nav bar stays dark navy in BOTH themes, so neutral text/icons
+   inside it must remain light even in light mode (re-override above). */
+html:not(.dark) nav .text-slate-400 { color: #94a3b8 !important; }
+html:not(.dark) nav .text-slate-300 { color: #cbd5e1 !important; }
+html:not(.dark) nav .text-slate-200 { color: #e2e8f0 !important; }
+
+/* --- Accent / colored text: deepen the -400/-300 shades for contrast --- */
+html:not(.dark) .text-violet-400  { color: #7c3aed !important; }
+html:not(.dark) .text-pink-400    { color: #db2777 !important; }
+html:not(.dark) .text-cyan-400    { color: #0891b2 !important; }
+html:not(.dark) .text-rose-400    { color: #e11d48 !important; }
+html:not(.dark) .text-red-400     { color: #dc2626 !important; }
+html:not(.dark) .text-red-300     { color: #dc2626 !important; }
+html:not(.dark) .hover\:text-red-300:hover { color: #b91c1c !important; }
+html:not(.dark) .text-amber-400   { color: #d97706 !important; }
+html:not(.dark) .text-blue-400    { color: #2563eb !important; }
+html:not(.dark) .text-emerald-400 { color: #059669 !important; }
+html:not(.dark) .text-indigo-400  { color: #4f46e5 !important; }
+html:not(.dark) .text-rose-500    { color: #e11d48 !important; }
+html:not(.dark) .text-amber-500   { color: #d97706 !important; }
+
+/* --- White text that sits on light panels must become dark --- */
+html:not(.dark) .overdue-item-title.text-white { color: var(--text-main) !important; }
+html:not(.dark) .add-btn.hover\:text-white:hover { color: var(--text-main) !important; }
+
