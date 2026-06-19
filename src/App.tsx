@@ -38,6 +38,7 @@ interface Task {
   pct: number;
   note: string;
   link?: string;
+  completedAt?: string; // ISO date set when the task is marked Done (col 3)
 }
 
 interface Member {
@@ -237,6 +238,7 @@ export default function App() {
     return d;
   });
   const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [dailyFilterMode, setDailyFilterMode] = useState<'date' | 'all'>('date');
   const [weeklyNote, setWeeklyNote] = useState('');
 
   // Modal States
@@ -400,6 +402,12 @@ export default function App() {
     const formattedForm = { ...taskForm };
     if (formattedForm.pct === 100) formattedForm.col = 3;
     if (formattedForm.col === 3) formattedForm.pct = 100;
+    // Stamp/clear the completion date so Team Velocity reflects real activity
+    if (formattedForm.col === 3) {
+      if (!formattedForm.completedAt) formattedForm.completedAt = new Date().toISOString().split('T')[0];
+    } else {
+      formattedForm.completedAt = undefined;
+    }
 
     if (editId !== null) {
       setTasks(prev => prev.map(t => t.id === editId ? { ...t, ...formattedForm } : t));
@@ -422,6 +430,12 @@ export default function App() {
           if (updated.col === 3) updated.pct = 100;
         } else if (field === 'note') {
           updated.note = value.trim();
+        }
+        // Keep completion date in sync with Done status
+        if (updated.col === 3 && !updated.completedAt) {
+          updated.completedAt = new Date().toISOString().split('T')[0];
+        } else if (updated.col !== 3) {
+          updated.completedAt = undefined;
         }
         return updated;
       }
@@ -658,17 +672,37 @@ export default function App() {
               <div className="panel">
                 <h3>Team Velocity <span>tasks completed</span></h3>
                 <div className="velocity-bar">
-                  {[2, 3, 1, 4, 2, tasks.filter(t => t.col === 3).length].map((val, i) => {
-                    const max = Math.max(val, 5);
-                    const h = Math.round((val / max) * 70);
-                    const labels = ['W-5', 'W-4', 'W-3', 'W-2', 'W-1', 'Now'];
-                    return (
-                      <div className="vel-col-wrap" key={i}>
-                        <div className="vel-col" style={{ height: `${h}px`, background: i === 5 ? 'var(--color-primary)' : 'rgba(99, 102, 241, 0.3)' }}></div>
-                        <div className="vel-lbl">{labels[i]}</div>
-                      </div>
-                    );
-                  })}
+                  {(() => {
+                    const today = new Date(); today.setHours(0, 0, 0, 0);
+                    // Monday of the current week (week starts Monday)
+                    const monday = new Date(today);
+                    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+                    const weeks = [];
+                    for (let i = 5; i >= 0; i--) {
+                      const start = new Date(monday); start.setDate(monday.getDate() - i * 7);
+                      const end = new Date(start); end.setDate(start.getDate() + 7); // exclusive
+                      const weekOfMonth = Math.ceil(start.getDate() / 7);
+                      const count = tasks.filter(t => {
+                        if (t.col !== 3) return false;
+                        const cd = t.completedAt || t.deadline; // fallback for older data
+                        if (!cd) return false;
+                        const d = new Date(cd); d.setHours(0, 0, 0, 0);
+                        return d >= start && d < end;
+                      }).length;
+                      weeks.push({ label: `W${weekOfMonth}/${start.getMonth() + 1}`, count, isNow: i === 0 });
+                    }
+                    const max = Math.max(...weeks.map(w => w.count), 1);
+                    return weeks.map((w, i) => {
+                      const h = w.count === 0 ? 6 : Math.max(10, Math.round((w.count / max) * 70));
+                      return (
+                        <div className="vel-col-wrap" key={i}>
+                          <div className="vel-count">{w.count}</div>
+                          <div className="vel-col" style={{ height: `${h}px`, background: w.isNow ? 'var(--color-primary)' : 'rgba(99, 102, 241, 0.3)' }}></div>
+                          <div className="vel-lbl">{w.label}</div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>
@@ -1141,21 +1175,70 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex gap-2 items-center no-print">
-                  <input 
-                    type="date" 
-                    value={dailyDate} 
-                    onChange={e => setDailyDate(e.target.value)} 
-                    className="daily-date-picker"
-                  />
                   <button className="btn-g" onClick={handlePrintDaily}>
                     <FileText size={12} /> Export PDF
                   </button>
                 </div>
               </div>
 
+              {/* Filter header — filter by Start Date */}
+              <div className="daily-filter no-print">
+                <span className="daily-filter-label">Lọc theo Start Date:</span>
+                <div className="daily-filter-toggle">
+                  <button
+                    className={`fb ${dailyFilterMode === 'date' ? 'active' : ''}`}
+                    onClick={() => setDailyFilterMode('date')}
+                  >
+                    Theo ngày
+                  </button>
+                  <button
+                    className={`fb ${dailyFilterMode === 'all' ? 'active' : ''}`}
+                    onClick={() => setDailyFilterMode('all')}
+                  >
+                    Tất cả
+                  </button>
+                </div>
+                <input
+                  type="date"
+                  value={dailyDate}
+                  disabled={dailyFilterMode === 'all'}
+                  onChange={e => { setDailyDate(e.target.value); setDailyFilterMode('date'); }}
+                  className="daily-date-picker"
+                />
+                <button
+                  className="fb"
+                  onClick={() => { setDailyDate(new Date().toISOString().split('T')[0]); setDailyFilterMode('date'); }}
+                >
+                  Hôm nay
+                </button>
+                <span className="daily-filter-hint">
+                  {dailyFilterMode === 'date'
+                    ? 'Chỉ hiện task có Start Date đúng ngày đã chọn'
+                    : 'Đang hiển thị tất cả task'}
+                </span>
+              </div>
+
+              {(() => {
+                const scopesWithTasks = (['ae', 'si', 'da', 'pr'] as const).filter(sc =>
+                  tasks.some(t => t.scope === sc && (dailyFilterMode === 'all' || t.start === dailyDate))
+                );
+                if (scopesWithTasks.length === 0) {
+                  return (
+                    <div className="daily-empty">
+                      Không có task nào có Start Date là{' '}
+                      <strong>{new Date(dailyDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</strong>.
+                      Chọn ngày khác hoặc bấm "Tất cả".
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Sections for each scope */}
               {(['ae', 'si', 'da', 'pr'] as const).map(sc => {
-                const st = tasks.filter(t => t.scope === sc);
+                const st = tasks
+                  .filter(t => t.scope === sc && (dailyFilterMode === 'all' || t.start === dailyDate))
+                  .sort((a, b) => (a.start || '').localeCompare(b.start || ''));
                 if (!st.length) return null;
 
                 return (
@@ -1224,30 +1307,35 @@ export default function App() {
                 );
               })}
 
-              {/* Summary */}
-              <div className="daily-summary mt-6">
-                <h3>Daily Summary Stats</h3>
-                <div className="summary-grid">
-                  <div className="sum-card">
-                    <div className="sn">{tasks.length}</div>
-                    <div className="sl text-muted">Total Tasks</div>
-                  </div>
-                  <div className="sum-card">
-                    <div className="sn text-success">{tasks.filter(t => t.col === 3).length}</div>
-                    <div className="sl text-muted">Completed</div>
-                  </div>
-                  <div className="sum-card">
-                    <div className="sn text-warning">{tasks.filter(t => t.col === 1).length}</div>
-                    <div className="sl text-muted">In Progress</div>
-                  </div>
-                  <div className="sum-card">
-                    <div className="sn text-main" style={{ color: 'var(--color-primary)' }}>
-                      {tasks.length ? Math.round(tasks.reduce((sum, t) => sum + t.pct, 0) / tasks.length) : 0}%
+              {/* Summary — reflects the active Start Date filter */}
+              {(() => {
+                const dailyTasks = tasks.filter(t => dailyFilterMode === 'all' || t.start === dailyDate);
+                return (
+                  <div className="daily-summary mt-6">
+                    <h3>Daily Summary Stats {dailyFilterMode === 'date' && <span className="text-muted">· theo Start Date</span>}</h3>
+                    <div className="summary-grid">
+                      <div className="sum-card">
+                        <div className="sn">{dailyTasks.length}</div>
+                        <div className="sl text-muted">Total Tasks</div>
+                      </div>
+                      <div className="sum-card">
+                        <div className="sn text-success">{dailyTasks.filter(t => t.col === 3).length}</div>
+                        <div className="sl text-muted">Completed</div>
+                      </div>
+                      <div className="sum-card">
+                        <div className="sn text-warning">{dailyTasks.filter(t => t.col === 1).length}</div>
+                        <div className="sl text-muted">In Progress</div>
+                      </div>
+                      <div className="sum-card">
+                        <div className="sn text-main" style={{ color: 'var(--color-primary)' }}>
+                          {dailyTasks.length ? Math.round(dailyTasks.reduce((sum, t) => sum + t.pct, 0) / dailyTasks.length) : 0}%
+                        </div>
+                        <div className="sl text-muted">Avg Progress</div>
+                      </div>
                     </div>
-                    <div className="sl text-muted">Avg Progress</div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           </div>
         )}
