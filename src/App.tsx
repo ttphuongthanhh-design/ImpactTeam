@@ -20,7 +20,10 @@ import {
   Sparkles,
   Sun,
   Moon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Lock,
+  Unlock,
+  Settings
 } from 'lucide-react';
 
 // Interfaces
@@ -267,6 +270,49 @@ export default function App() {
   });
   const [weeklyNote, setWeeklyNote] = useState('');
 
+  // --- Security / permissions ---
+  const [editPwdHash, setEditPwdHash] = useState<string>(() => localStorage.getItem('impact_editpwd') || '');
+  // If no password has been set yet, start editable so the owner can set one up.
+  const [isEditMode, setIsEditMode] = useState<boolean>(() => !localStorage.getItem('impact_editpwd'));
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [pwdForm, setPwdForm] = useState({ next: '', confirm: '' });
+
+  const hashPwd = (s: string) => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return 'h' + h.toString(36);
+  };
+
+  const enterEditMode = () => {
+    if (!editPwdHash) { setIsEditMode(true); return; }
+    const p = window.prompt('Nhập mật khẩu để chuyển sang chế độ Chỉnh sửa:');
+    if (p == null) return;
+    if (hashPwd(p) === editPwdHash) setIsEditMode(true);
+    else alert('Mật khẩu không đúng.');
+  };
+
+  const lockToView = () => setIsEditMode(false);
+
+  const handleSavePassword = () => {
+    const next = pwdForm.next.trim();
+    if (!next) {
+      // empty -> remove password protection
+      localStorage.removeItem('impact_editpwd');
+      setEditPwdHash('');
+      setShowSecurityModal(false);
+      setPwdForm({ next: '', confirm: '' });
+      alert('Đã gỡ mật khẩu. Mọi người mở file sẽ chỉnh sửa được.');
+      return;
+    }
+    if (next !== pwdForm.confirm.trim()) { alert('Mật khẩu nhập lại không khớp.'); return; }
+    const h = hashPwd(next);
+    localStorage.setItem('impact_editpwd', h);
+    setEditPwdHash(h);
+    setShowSecurityModal(false);
+    setPwdForm({ next: '', confirm: '' });
+    alert('Đã lưu mật khẩu. Lần mở sau sẽ ở chế độ Chỉ xem cho tới khi nhập đúng mật khẩu.');
+  };
+
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -320,6 +366,7 @@ export default function App() {
   };
 
   const openMemberModal = () => {
+    if (!isEditMode) return;
     resetMemberForm();
     setIsMemberModalOpen(true);
   };
@@ -381,6 +428,7 @@ export default function App() {
 
   // --- Helpers ---
   const handleOpenAddModal = (colIndex: number) => {
+    if (!isEditMode) return;
     setEditId(null);
     setTaskForm({
       title: '',
@@ -402,6 +450,7 @@ export default function App() {
   };
 
   const handleOpenEditModal = (task: Task) => {
+    if (!isEditMode) return;
     setEditId(task.id);
     setTaskForm({ ...task });
     setIsAddingSubtype(false);
@@ -415,6 +464,7 @@ export default function App() {
   };
 
   const handleDeleteTask = (id: number) => {
+    if (!isEditMode) return;
     if (confirm('Delete this task?')) {
       setTasks(prev => prev.filter(t => t.id !== id));
       if (isModalOpen && editId === id) setIsModalOpen(false);
@@ -445,6 +495,7 @@ export default function App() {
   };
 
   const updateTaskField = (id: number, field: keyof Task, value: any) => {
+    if (!isEditMode) return;
     setTasks(prev => prev.map(t => {
       if (t.id === id) {
         const updated = { ...t, [field]: value };
@@ -640,7 +691,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen pb-12">
+    <div className={`min-h-screen pb-12 ${isEditMode ? '' : 'read-only'}`}>
       {/* Navigation */}
       <nav className="no-print">
         <div className="nav-logo">IMPACT TEAM</div>
@@ -659,7 +710,23 @@ export default function App() {
           >
             {darkMode ? <Sun size={14} className="text-yellow-400" /> : <Moon size={14} />}
           </button>
-          <button className="btn-p" onClick={() => handleOpenAddModal(0)}>
+
+          {isEditMode ? (
+            <>
+              <button className="lock-pill unlocked" onClick={lockToView} title="Khoá lại (chuyển sang Chỉ xem)">
+                <Unlock size={13} /> Đang chỉnh sửa
+              </button>
+              <button className="lock-gear" onClick={() => { setPwdForm({ next: '', confirm: '' }); setShowSecurityModal(true); }} title="Cài đặt mật khẩu">
+                <Settings size={14} />
+              </button>
+            </>
+          ) : (
+            <button className="lock-pill locked" onClick={enterEditMode} title="Nhập mật khẩu để chỉnh sửa">
+              <Lock size={13} /> Chỉ xem
+            </button>
+          )}
+
+          <button className="btn-p edit-only" onClick={() => handleOpenAddModal(0)}>
             <Plus size={14} /> New Task
           </button>
         </div>
@@ -892,7 +959,7 @@ export default function App() {
                     {mem.name.charAt(0) + mem.name.slice(1).toLowerCase()}
                   </button>
                 ))}
-                <button className="fb fb-add" onClick={openMemberModal} title="Thêm thành viên">
+                <button className="fb fb-add edit-only" onClick={openMemberModal} title="Thêm thành viên">
                   <Plus size={12} />
                 </button>
               </div>
@@ -986,13 +1053,13 @@ export default function App() {
                     <div className="tasks-area">
                       {filteredColTasks.map(task => (
                         <div 
-                          className="task-card animate-fade-in" 
+                          className="task-card animate-fade-in"
                           key={task.id}
-                          draggable
-                          onDragStart={() => setDraggedTaskId(task.id)}
+                          draggable={isEditMode}
+                          onDragStart={() => isEditMode && setDraggedTaskId(task.id)}
                           onDragEnd={() => setDraggedTaskId(null)}
                         >
-                          <div className="tc-actions">
+                          <div className="tc-actions edit-only">
                             <button className="flex items-center gap-1 text-[9px]" onClick={() => handleOpenEditModal(task)}>
                               <Edit2 size={8} /> Edit
                             </button>
@@ -1052,7 +1119,7 @@ export default function App() {
                     </div>
 
                     {colIdx !== 4 && (
-                      <button className="add-btn hover:text-white" onClick={() => handleOpenAddModal(colIdx)}>
+                      <button className="add-btn hover:text-white edit-only" onClick={() => handleOpenAddModal(colIdx)}>
                         <Plus size={12} /> Add task
                       </button>
                     )}
@@ -1346,19 +1413,21 @@ export default function App() {
                               </div>
                             </td>
                             <td className="p-4 text-center">
-                              <input 
-                                type="number" 
+                              <input
+                                type="number"
                                 className="pct-input"
-                                min="0" 
-                                max="100" 
-                                value={t.pct} 
-                                onChange={e => updateTaskField(t.id, 'pct', e.target.value)} 
+                                min="0"
+                                max="100"
+                                value={t.pct}
+                                disabled={!isEditMode}
+                                onChange={e => updateTaskField(t.id, 'pct', e.target.value)}
                               />
                             </td>
                             <td className="p-4">
-                              <select 
+                              <select
                                 className="status-sel"
-                                value={t.col} 
+                                value={t.col}
+                                disabled={!isEditMode}
                                 onChange={e => updateTaskField(t.id, 'col', e.target.value)}
                               >
                                 {COLS.map((colName, idx) => (
@@ -1372,6 +1441,7 @@ export default function App() {
                                 rows={2}
                                 value={t.note || ''}
                                 placeholder="Update progress notes..."
+                                disabled={!isEditMode}
                                 onChange={e => updateTaskField(t.id, 'note', e.target.value)}
                               />
                             </td>
@@ -1593,10 +1663,11 @@ export default function App() {
               {/* Next Week Focus */}
               <div className="panel mt-4 no-print">
                 <h3 className="mb-2">Next Week Focus & Notes</h3>
-                <textarea 
-                  className="weekly-note" 
+                <textarea
+                  className="weekly-note"
                   placeholder="Ghi chú định hướng tuần tới, rủi ro cần escalate..."
                   value={weeklyNote}
+                  disabled={!isEditMode}
                   onChange={e => setWeeklyNote(e.target.value)}
                 />
               </div>
@@ -1922,6 +1993,52 @@ export default function App() {
 
             <div className="modal-actions">
               <button type="button" onClick={() => { resetMemberForm(); setIsMemberModalOpen(false); }}>Đóng</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSecurityModal && (
+        <div className="modal-bg show">
+          <div className="modal modal-sm">
+            <h3>
+              <span>Bảo mật — Mật khẩu chỉnh sửa</span>
+              <button type="button" className="bg-transparent border-none text-slate-400 hover:text-slate-200 p-1" onClick={() => setShowSecurityModal(false)}>
+                <X size={16} />
+              </button>
+            </h3>
+
+            <p className="text-[12px] text-muted" style={{ marginBottom: 12 }}>
+              {editPwdHash
+                ? 'Đặt mật khẩu mới, hoặc để trống rồi Lưu để gỡ khoá. Khi đã có mật khẩu, mỗi lần mở file sẽ ở chế độ Chỉ xem cho tới khi nhập đúng.'
+                : 'Chưa đặt mật khẩu — mọi người mở file đều chỉnh sửa được. Đặt mật khẩu để bật chế độ phân quyền Xem/Sửa.'}
+            </p>
+
+            <div className="fg">
+              <label>Mật khẩu mới</label>
+              <input
+                type="password"
+                value={pwdForm.next}
+                onChange={e => setPwdForm(prev => ({ ...prev, next: e.target.value }))}
+                placeholder="Nhập mật khẩu..."
+              />
+            </div>
+            <div className="fg">
+              <label>Nhập lại mật khẩu</label>
+              <input
+                type="password"
+                value={pwdForm.confirm}
+                onChange={e => setPwdForm(prev => ({ ...prev, confirm: e.target.value }))}
+                placeholder="Nhập lại..."
+                onKeyDown={e => { if (e.key === 'Enter') handleSavePassword(); }}
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" onClick={() => setShowSecurityModal(false)}>Hủy</button>
+              <button type="button" className="btn-p" onClick={handleSavePassword}>
+                <Lock size={14} /> Lưu mật khẩu
+              </button>
             </div>
           </div>
         </div>
