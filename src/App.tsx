@@ -520,8 +520,10 @@ export default function App() {
     const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
     const weekOfMonth = Math.ceil(monday.getDate() / 7);
     const label = `W${weekOfMonth}/${monday.getMonth() + 1}`;
-    const range = `${monday.getDate()}/${monday.getMonth() + 1} – ${sunday.getDate()}/${sunday.getMonth() + 1}/${sunday.getFullYear()}`;
-    return { key, monday, sunday, weekOfMonth, label, range };
+    const range = `${monday.getDate()}/${monday.getMonth() + 1}/${monday.getFullYear()} - ${sunday.getDate()}/${sunday.getMonth() + 1}/${sunday.getFullYear()}`;
+    // Full display: W{week}/{month} - {dd/mm/yyyy} - {dd/mm/yyyy}
+    const full = `${label} - ${range}`;
+    return { key, monday, sunday, weekOfMonth, label, range, full };
   };
 
   // A task belongs to the selected week based on its Start Date
@@ -1391,7 +1393,7 @@ export default function App() {
                 <div className="weekly-to">
                   {weeklyFilter === 'all'
                     ? <>Hiển thị <strong>tất cả các tuần</strong></>
-                    : <>{getWeekInfo(weeklyFilter).label} · <strong>{getWeekInfo(weeklyFilter).range}</strong></>}
+                    : <strong>{getWeekInfo(weeklyFilter).full}</strong>}
                 </div>
               </div>
 
@@ -1406,7 +1408,7 @@ export default function App() {
                 >
                   <option value="all">Tất cả các tuần</option>
                   {getWeekOptions().map(w => (
-                    <option value={w.key} key={w.key}>{w.label}/{w.monday.getFullYear()} · {w.range}</option>
+                    <option value={w.key} key={w.key}>{w.full}</option>
                   ))}
                 </select>
                 <button className="fb" onClick={() => shiftWeek(1)} title="Tuần sau">›</button>
