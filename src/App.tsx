@@ -28,7 +28,7 @@ interface Task {
   id: number;
   title: string;
   desc: string;
-  scope: 'ae' | 'si' | 'da' | 'pr';
+  scope: 'ae' | 'si' | 'pd' | 'va' | 'pr';
   subtype: string;
   assignee: string;
   priority: 'high' | 'med' | 'low';
@@ -77,14 +77,15 @@ const MEMBER_COLORS = [
   'linear-gradient(135deg, #c084fc, #7c3aed)',
   'linear-gradient(135deg, #94a3b8, #475569)',
 ];
-const SCOPES: Record<'ae' | 'si' | 'da' | 'pr', string> = {
+const SCOPES: Record<'ae' | 'si' | 'pd' | 'va' | 'pr', string> = {
   ae: 'Activation & Event',
   si: 'Social & Influencers',
-  da: 'Data & AI',
+  pd: 'Performance & Data',
+  va: 'Visual & AI',
   pr: 'Production'
 };
 
-const SCOPE_CONFIGS: Record<'ae' | 'si' | 'da' | 'pr', ScopeConfig> = {
+const SCOPE_CONFIGS: Record<'ae' | 'si' | 'pd' | 'va' | 'pr', ScopeConfig> = {
   ae: { 
     name: 'Activation & Event', 
     color: '#8b5cf6', 
@@ -99,14 +100,21 @@ const SCOPE_CONFIGS: Record<'ae' | 'si' | 'da' | 'pr', ScopeConfig> = {
     badge: 'bg-pink-950/40 text-pink-400 border border-pink-800/30',
     text: 'text-pink-400'
   },
-  da: { 
-    name: 'Data & AI', 
-    color: '#06b6d4', 
-    glow: 'rgba(6, 182, 212, 0.25)', 
+  pd: {
+    name: 'Performance & Data',
+    color: '#06b6d4',
+    glow: 'rgba(6, 182, 212, 0.25)',
     badge: 'bg-cyan-950/40 text-cyan-400 border border-cyan-800/30',
     text: 'text-cyan-400'
   },
-  pr: { 
+  va: {
+    name: 'Visual & AI',
+    color: '#14b8a6',
+    glow: 'rgba(20, 184, 166, 0.25)',
+    badge: 'bg-teal-950/40 text-teal-400 border border-teal-800/30',
+    text: 'text-teal-400'
+  },
+  pr: {
     name: 'Production', 
     color: '#f43f5e', 
     glow: 'rgba(244, 63, 94, 0.25)', 
@@ -122,10 +130,11 @@ const PRIORITY_BADGES = {
   low: 'bg-blue-950/40 text-blue-400 border border-blue-800/30'
 };
 
-const defaultSubtypes: Record<'ae' | 'si' | 'da' | 'pr', string[]> = {
+const defaultSubtypes: Record<'ae' | 'si' | 'pd' | 'va' | 'pr', string[]> = {
   ae: ['Planning & Brief', 'Concept Development', 'Vendor Management', 'Site Survey', 'Timeline & Budget', 'Proposal / Sale Kit', 'Post-event Report'],
   si: ['Influencer Scouting', 'Influencer Brief', 'Content Plan', 'KOL Coordination', 'Performance Tracking', 'Community Management'],
-  da: ['Data Collection', 'Dashboard & Report', 'Audience Segmentation', 'AI Tool / Automation', 'Insight Analysis', 'Template & System'],
+  pd: ['Data Collection', 'Dashboard & Report', 'Audience Segmentation', 'Performance Tracking', 'Insight Analysis', 'Reporting & KPI'],
+  va: ['Visual Concept', 'Design / Artwork', 'AI Tool / Automation', 'Video & Motion', 'Template & System', 'Asset Library'],
   pr: ['Site Survey', 'Quotation & Supplier', 'Production Monitoring', 'POSM / Print', 'Logistics & Setup', 'PG/PB Management', 'Onsite Supervision', 'Post-production Report', 'Checklist & QC']
 };
 
@@ -138,11 +147,11 @@ const defaultTasks: Task[] = [
   { id: 4, title: 'Timeline & logistics plan Q3', desc: '', scope: 'ae', subtype: 'Timeline & Budget', assignee: 'T', priority: 'high', col: 1, start: '2025-07-03', deadline: '2025-07-12', pct: 50, note: 'Đang draft timeline' },
   { id: 5, title: 'KOL list — July campaign', desc: '', scope: 'si', subtype: 'Influencer Scouting', assignee: 'T', priority: 'med', col: 0, start: '2025-07-07', deadline: '2025-07-15', pct: 10, note: '' },
   { id: 6, title: 'Content plan — Social July', desc: '', scope: 'si', subtype: 'Content Plan', assignee: 'T', priority: 'high', col: 2, start: '2025-06-25', deadline: '2025-07-01', pct: 75, note: 'Chờ client approve' },
-  { id: 7, title: 'Performance dashboard — KPI', desc: '', scope: 'da', subtype: 'Dashboard & Report', assignee: 'T', priority: 'high', col: 1, start: '2025-07-01', deadline: '2025-07-03', pct: 60, note: 'Đang pull data từ Meta' },
-  { id: 8, title: 'Audience segmentation Q2', desc: '', scope: 'da', subtype: 'Audience Segmentation', assignee: 'T', priority: 'low', col: 3, start: '2025-06-20', deadline: '2025-06-30', pct: 100, note: 'Hoàn thành' },
+  { id: 7, title: 'Performance dashboard — KPI', desc: '', scope: 'pd', subtype: 'Dashboard & Report', assignee: 'T', priority: 'high', col: 1, start: '2025-07-01', deadline: '2025-07-03', pct: 60, note: 'Đang pull data từ Meta' },
+  { id: 8, title: 'Audience segmentation Q2', desc: '', scope: 'pd', subtype: 'Audience Segmentation', assignee: 'T', priority: 'low', col: 3, start: '2025-06-20', deadline: '2025-06-30', pct: 100, note: 'Hoàn thành' },
   { id: 9, title: 'POSM production monitoring', desc: '', scope: 'pr', subtype: 'Production Monitoring', assignee: 'M', priority: 'high', col: 1, start: '2025-07-03', deadline: '2025-07-08', pct: 45, note: 'Đang theo dõi tại xưởng' },
   { id: 10, title: 'PG/PB recruitment & briefing', desc: '', scope: 'pr', subtype: 'PG/PB Management', assignee: 'M', priority: 'med', col: 0, start: '2025-07-10', deadline: '2025-07-18', pct: 0, note: '' },
-  { id: 11, title: 'AI reporting template', desc: '', scope: 'da', subtype: 'AI Tool / Automation', assignee: 'T', priority: 'low', col: 3, start: '2025-06-22', deadline: '2025-06-28', pct: 100, note: 'Done' },
+  { id: 11, title: 'AI reporting template', desc: '', scope: 'va', subtype: 'AI Tool / Automation', assignee: 'T', priority: 'low', col: 3, start: '2025-06-22', deadline: '2025-06-28', pct: 100, note: 'Done' },
   { id: 12, title: 'Sale kit & proposal — Activation', desc: '', scope: 'ae', subtype: 'Proposal / Sale Kit', assignee: 'T', priority: 'med', col: 0, start: '2025-07-14', deadline: '2025-07-22', pct: 0, note: '' },
   { id: 13, title: 'Logistics & setup plan — onsite', desc: '', scope: 'pr', subtype: 'Logistics & Setup', assignee: 'M', priority: 'med', col: 1, start: '2025-07-05', deadline: '2025-07-14', pct: 20, note: 'Đang liên hệ vendor vận chuyển' },
   { id: 14, title: 'Checklist QC — pre-event', desc: '', scope: 'pr', subtype: 'Checklist & QC', assignee: 'M', priority: 'high', col: 0, start: '2025-07-12', deadline: '2025-07-19', pct: 0, note: '' },
@@ -156,7 +165,10 @@ export default function App() {
       const saved = localStorage.getItem('impact_tasks');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Migrate removed scope 'da' (Data & AI) -> 'pd' (Performance & Data)
+          return parsed.map((t: Task) => (t.scope as string) === 'da' ? { ...t, scope: 'pd' } : t);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -164,12 +176,19 @@ export default function App() {
     return defaultTasks;
   });
 
-  const [subtypes, setSubtypes] = useState<Record<'ae' | 'si' | 'da' | 'pr', string[]>>(() => {
+  const [subtypes, setSubtypes] = useState<Record<'ae' | 'si' | 'pd' | 'va' | 'pr', string[]>>(() => {
     try {
       const saved = localStorage.getItem('impact_subtypes');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') return parsed;
+        if (parsed && typeof parsed === 'object') {
+          // Migrate 'da' subtypes -> 'pd'; ensure 'pd' and 'va' keys exist
+          if (parsed.da && !parsed.pd) { parsed.pd = parsed.da; }
+          delete parsed.da;
+          if (!parsed.pd) parsed.pd = defaultSubtypes.pd;
+          if (!parsed.va) parsed.va = defaultSubtypes.va;
+          return parsed;
+        }
       }
     } catch (e) {
       console.error(e);
@@ -227,8 +246,8 @@ export default function App() {
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
-  const [scopeFilter, setScopeFilter] = useState<'all' | 'ae' | 'si' | 'da' | 'pr'>('all');
-  const [timelineScopeFilter, setTimelineScopeFilter] = useState<'all' | 'ae' | 'si' | 'da' | 'pr'>('all');
+  const [scopeFilter, setScopeFilter] = useState<'all' | 'ae' | 'si' | 'pd' | 'va' | 'pr'>('all');
+  const [timelineScopeFilter, setTimelineScopeFilter] = useState<'all' | 'ae' | 'si' | 'pd' | 'va' | 'pr'>('all');
 
   // Date States
   const [ganttStart, setGanttStart] = useState<Date>(() => {
@@ -465,7 +484,7 @@ export default function App() {
     setIsAddingSubtype(false);
   };
 
-  const handleRemoveSubtype = (scope: 'ae' | 'si' | 'da' | 'pr', val: string) => {
+  const handleRemoveSubtype = (scope: 'ae' | 'si' | 'pd' | 'va' | 'pr', val: string) => {
     setSubtypes(prev => ({
       ...prev,
       [scope]: prev[scope].filter(s => s !== val)
@@ -519,9 +538,9 @@ export default function App() {
     const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
     const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
     const weekOfMonth = Math.ceil(monday.getDate() / 7);
-    const label = `W${weekOfMonth}/${monday.getMonth() + 1}`;
+    const label = `Week ${weekOfMonth}`;
     const range = `${monday.getDate()}/${monday.getMonth() + 1}/${monday.getFullYear()} - ${sunday.getDate()}/${sunday.getMonth() + 1}/${sunday.getFullYear()}`;
-    // Full display: W{week}/{month} - {dd/mm/yyyy} - {dd/mm/yyyy}
+    // Full display: Week {n} - {dd/mm/yyyy} - {dd/mm/yyyy}  (n = week-of-month)
     const full = `${label} - ${range}`;
     return { key, monday, sunday, weekOfMonth, label, range, full };
   };
@@ -684,7 +703,7 @@ export default function App() {
               <div className="panel">
                 <h3>Scope Health <span>% completion by scope</span></h3>
                 <div className="flex flex-col gap-4 mt-2">
-                  {(['ae', 'si', 'da', 'pr'] as const).map(sc => {
+                  {(['ae', 'si', 'pd', 'va', 'pr'] as const).map(sc => {
                     const st = tasks.filter(t => t.scope === sc);
                     if (!st.length) return null;
                     const pct = Math.round(st.reduce((sum, t) => sum + (t.pct || 0), 0) / st.length);
@@ -759,8 +778,8 @@ export default function App() {
                   {members.map(mem => {
                     const m = mem.id;
                     const mt = tasks.filter(t => t.assignee === m);
-                    const matched = (['ae', 'si', 'da', 'pr'] as const).filter(sc => mt.some(t => t.scope === sc));
-                    const scArr = matched.length ? matched : (['ae', 'si', 'da', 'pr'] as const);
+                    const matched = (['ae', 'si', 'pd', 'va', 'pr'] as const).filter(sc => mt.some(t => t.scope === sc));
+                    const scArr = matched.length ? matched : (['ae', 'si', 'pd', 'va', 'pr'] as const);
                     return (
                       <div className="member-load" key={m}>
                         <div className="av w-8 h-8 text-xs font-bold" style={{ background: mem.color, color: '#fff' }}>{memberInitial(m)}</div>
@@ -866,7 +885,7 @@ export default function App() {
               </div>
               <div className="filters pl-3 border-l border-white/10">
                 <button className={`fb ${scopeFilter === 'all' ? 'active' : ''}`} onClick={() => setScopeFilter('all')}>All Scopes</button>
-                {(['ae', 'si', 'da', 'pr'] as const).map(sc => (
+                {(['ae', 'si', 'pd', 'va', 'pr'] as const).map(sc => (
                   <button key={sc} className={`fb ${scopeFilter === sc ? 'active' : ''}`} onClick={() => setScopeFilter(sc)}>{SCOPES[sc]}</button>
                 ))}
               </div>
@@ -1038,7 +1057,7 @@ export default function App() {
               <h2>Gantt Timeline</h2>
               <div className="tl-scope-tabs">
                 <button className={`tl-tab ${timelineScopeFilter === 'all' ? 'active' : ''}`} onClick={() => setTimelineScopeFilter('all')}>All Scopes</button>
-                {(['ae', 'si', 'da', 'pr'] as const).map(sc => (
+                {(['ae', 'si', 'pd', 'va', 'pr'] as const).map(sc => (
                   <button key={sc} className={`tl-tab ${timelineScopeFilter === sc ? 'active' : ''}`} onClick={() => setTimelineScopeFilter(sc)}>{SCOPES[sc]}</button>
                 ))}
               </div>
@@ -1076,7 +1095,7 @@ export default function App() {
               const LABEL_W = 220;
               const totalW = LABEL_W + GANTT_DAYS * DAY_W;
 
-              const scopeOrder = ['ae', 'si', 'da', 'pr'] as const;
+              const scopeOrder = ['ae', 'si', 'pd', 'va', 'pr'] as const;
               const activeScopes = timelineScopeFilter === 'all' ? scopeOrder : [timelineScopeFilter];
               const timelineTasks = tasks.filter(t => activeScopes.includes(t.scope) && (t.start || t.deadline));
 
@@ -1192,7 +1211,7 @@ export default function App() {
             {/* Timeline Legend */}
             <div className="tl-legend mt-4">
               <div className="text-[11px] font-bold text-slate-400 mr-2 uppercase">Legend:</div>
-              {(['ae', 'si', 'da', 'pr'] as const).map(sc => (
+              {(['ae', 'si', 'pd', 'va', 'pr'] as const).map(sc => (
                 <div className="tl-legend-item" key={sc}>
                   <div className="tl-legend-dot" style={{ background: SCOPE_CONFIGS[sc].color }}></div>
                   {SCOPES[sc]}
@@ -1263,7 +1282,7 @@ export default function App() {
               </div>
 
               {(() => {
-                const scopesWithTasks = (['ae', 'si', 'da', 'pr'] as const).filter(sc =>
+                const scopesWithTasks = (['ae', 'si', 'pd', 'va', 'pr'] as const).filter(sc =>
                   tasks.some(t => t.scope === sc && (dailyFilterMode === 'all' || t.start === dailyDate))
                 );
                 if (scopesWithTasks.length === 0) {
@@ -1279,7 +1298,7 @@ export default function App() {
               })()}
 
               {/* Sections for each scope */}
-              {(['ae', 'si', 'da', 'pr'] as const).map(sc => {
+              {(['ae', 'si', 'pd', 'va', 'pr'] as const).map(sc => {
                 const st = tasks
                   .filter(t => t.scope === sc && (dailyFilterMode === 'all' || t.start === dailyDate))
                   .sort((a, b) => (a.start || '').localeCompare(b.start || ''));
@@ -1440,7 +1459,7 @@ export default function App() {
 
               {/* Weekly content - KPIs by Scope */}
               <div className="scope-kpi-grid mt-4">
-                {(['ae', 'si', 'da', 'pr'] as const).map(sc => {
+                {(['ae', 'si', 'pd', 'va', 'pr'] as const).map(sc => {
                   const st = tasks.filter(t => t.scope === sc && inSelectedWeek(t));
                   if (!st.length) return null;
 
@@ -1483,8 +1502,8 @@ export default function App() {
                 {members.map(mem => {
                   const m = mem.id;
                   const mt = tasks.filter(t => t.assignee === m && inSelectedWeek(t));
-                  const matched = (['ae', 'si', 'da', 'pr'] as const).filter(sc => mt.some(t => t.scope === sc));
-                  const scArr = matched.length ? matched : (['ae', 'si', 'da', 'pr'] as const);
+                  const matched = (['ae', 'si', 'pd', 'va', 'pr'] as const).filter(sc => mt.some(t => t.scope === sc));
+                  const scArr = matched.length ? matched : (['ae', 'si', 'pd', 'va', 'pr'] as const);
 
                   return (
                     <div className="member-row" key={m}>
@@ -1627,7 +1646,7 @@ export default function App() {
                 <select 
                   value={taskForm.scope}
                   onChange={e => {
-                    const newScope = e.target.value as 'ae' | 'si' | 'da' | 'pr';
+                    const newScope = e.target.value as 'ae' | 'si' | 'pd' | 'va' | 'pr';
                     setTaskForm(prev => ({ 
                       ...prev, 
                       scope: newScope, 
@@ -1635,10 +1654,9 @@ export default function App() {
                     }));
                   }}
                 >
-                  <option value="ae">Activation & Event</option>
-                  <option value="si">Social & Influencers</option>
-                  <option value="da">Data & AI</option>
-                  <option value="pr">Production</option>
+                  {(['ae', 'si', 'pd', 'va', 'pr'] as const).map(sc => (
+                    <option value={sc} key={sc}>{SCOPES[sc]}</option>
+                  ))}
                 </select>
               </div>
 
