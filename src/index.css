@@ -1824,3 +1824,22 @@ html:not(.dark) .add-btn.hover\:text-white:hover { color: var(--text-main) !impo
   align-items: center;
 }
 
+/* Overdue & At-Risk: header count badges + per-row status label */
+.risk-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.risk-counts .badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+}
+.overdue-item-meta .badge {
+  font-size: 9px;
+  padding: 2px 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+

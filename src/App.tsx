@@ -702,49 +702,55 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Overdue Items list */}
+              {/* Overdue & At-Risk list — URGENT (overdue) / NEAR (≤7 days to deadline) */}
               <div className="panel">
-                <h3>Overdue & At-Risk Items</h3>
-                <div className="overdue-list">
-                  {tasks.filter(t => {
-                    if (!t.deadline || t.col === 3 || t.col === 4) return false;
-                    const d = new Date(t.deadline); d.setHours(0,0,0,0);
-                    return d < new Date();
-                  }).map(t => {
-                    const d = new Date(t.deadline); d.setHours(0,0,0,0);
-                    const today = new Date(); today.setHours(0,0,0,0);
-                    const diffDays = Math.round((today.getTime() - d.getTime()) / 864e5);
-                    return (
-                      <div className="overdue-item" key={t.id}>
-                        <span className="overdue-item-dot bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]"></span>
-                        <div className="flex-1">
-                          <div className="overdue-item-title font-semibold text-white">{t.title}</div>
-                          <div className="overdue-item-meta text-[10px] text-slate-400">
-                            {SCOPES[t.scope]} · {memberName(t.assignee)} · <strong className="text-rose-400">{diffDays}d overdue</strong>
-                          </div>
-                        </div>
-                        <span className={`badge ${PRIORITY_BADGES[t.priority]}`}>{t.priority}</span>
+                {(() => {
+                  const today = new Date(); today.setHours(0, 0, 0, 0);
+                  const atRisk = tasks
+                    .filter(t => t.deadline && t.col !== 3 && t.col !== 4)
+                    .map(t => {
+                      const d = new Date(t.deadline); d.setHours(0, 0, 0, 0);
+                      const diff = Math.round((d.getTime() - today.getTime()) / 864e5);
+                      return { t, diff };
+                    })
+                    .filter(x => x.diff <= 7)            // overdue OR due within a week
+                    .sort((a, b) => a.diff - b.diff);    // most overdue first
+                  const urgentCount = atRisk.filter(x => x.diff < 0).length;   // past deadline
+                  const nearCount = atRisk.length - urgentCount;               // due in ≤7 days
+
+                  return (
+                    <>
+                      <h3>
+                        <span>Overdue &amp; At-Risk Items</span>
+                        <span className="risk-counts">
+                          <span className="badge status-badge-danger">{urgentCount} URGENT</span>
+                          <span className="badge status-badge-warning">{nearCount} NEAR</span>
+                        </span>
+                      </h3>
+                      <div className="overdue-list">
+                        {atRisk.length === 0 && (
+                          <div className="text-[11px] text-muted">Không có mục nào quá hạn hoặc sắp tới hạn trong 7 ngày.</div>
+                        )}
+                        {atRisk.map(({ t, diff }) => {
+                          const isUrgent = diff < 0;
+                          return (
+                            <div className="overdue-item" key={t.id}>
+                              <span className={`overdue-item-dot ${isUrgent ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]'}`}></span>
+                              <div className="flex-1">
+                                <div className="overdue-item-title font-semibold text-white">{t.title}</div>
+                                <div className="overdue-item-meta text-[10px] text-slate-400 flex items-center gap-1 flex-wrap">
+                                  <span>{SCOPES[t.scope]} · {memberName(t.assignee)}</span>
+                                  <span className={`badge ${isUrgent ? 'status-badge-danger' : 'status-badge-warning'}`}>{isUrgent ? 'URGENT' : 'NEAR'}</span>
+                                </div>
+                              </div>
+                              <span className={`badge ${PRIORITY_BADGES[t.priority]}`}>{t.priority}</span>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                  {tasks.filter(t => {
-                    if (!t.deadline || t.col === 3 || t.col === 4) return false;
-                    const d = new Date(t.deadline); d.setHours(0,0,0,0);
-                    const diff = Math.round((d.getTime() - new Date().getTime()) / 864e5);
-                    return diff >= 0 && diff <= 5;
-                  }).map(t => (
-                    <div className="overdue-item" key={t.id}>
-                      <span className="overdue-item-dot bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></span>
-                      <div className="flex-1">
-                        <div className="overdue-item-title font-semibold text-white">{t.title}</div>
-                        <div className="overdue-item-meta text-[10px] text-slate-400">
-                          {SCOPES[t.scope]} · {memberName(t.assignee)} · Due soon
-                        </div>
-                      </div>
-                      <span className={`badge ${PRIORITY_BADGES[t.priority]}`}>{t.priority}</span>
-                    </div>
-                  ))}
-                </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
