@@ -1843,3 +1843,20 @@ html:not(.dark) .add-btn.hover\:text-white:hover { color: var(--text-main) !impo
   letter-spacing: 0.3px;
 }
 
+/* Unified deadline status badge on Kanban cards */
+.deadline-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* Status badges inside the Gantt task label */
+.gantt-label .gl-sub .badge {
+  font-size: 9px;
+  padding: 2px 7px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+

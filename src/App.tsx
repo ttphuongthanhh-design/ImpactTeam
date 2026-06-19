@@ -492,23 +492,32 @@ export default function App() {
   };
 
   // Date Label Helper for Kanban
+  // Unified deadline classification used across Kanban, Gantt, and the At-Risk panel.
+  // URGENT = past deadline · NEAR = due within 7 days · normal = further out.
+  const getDeadlineStatus = (deadline: string) => {
+    if (!deadline) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dd = new Date(deadline); dd.setHours(0, 0, 0, 0);
+    const diff = Math.round((dd.getTime() - today.getTime()) / 864e5);
+    if (diff < 0) return { kind: 'urgent' as const, label: 'URGENT', diff };
+    if (diff <= 7) return { kind: 'near' as const, label: 'NEAR', diff };
+    return { kind: 'normal' as const, label: '', diff };
+  };
+
   const getDeadlineBadge = (deadline: string, col: number) => {
     if (!deadline || col === 3 || col === 4) return null;
-    const today = new Date(); today.setHours(0,0,0,0);
-    const dd = new Date(deadline); dd.setHours(0,0,0,0);
-    const diff = Math.round((dd.getTime() - today.getTime()) / 864e5);
+    const st = getDeadlineStatus(deadline);
+    if (!st) return null;
+    const dd = new Date(deadline); dd.setHours(0, 0, 0, 0);
     const fmt = dd.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 
-    if (diff < 0) {
-      return <div className="mt-1 text-[10px] font-bold text-red-400 bg-red-950/20 px-2 py-0.5 rounded border border-red-900/30">⚠ Overdue: {fmt}</div>;
+    if (st.kind === 'urgent') {
+      return <div className="deadline-badge badge status-badge-danger mt-2">⚠ URGENT · {fmt}</div>;
     }
-    if (diff === 0) {
-      return <div className="mt-1 text-[10px] font-bold text-amber-400 bg-amber-950/20 px-2 py-0.5 rounded border border-amber-900/30">Today: {fmt}</div>;
+    if (st.kind === 'near') {
+      return <div className="deadline-badge badge status-badge-warning mt-2">⏳ NEAR · {fmt}</div>;
     }
-    if (diff <= 3) {
-      return <div className="mt-1 text-[10px] font-semibold text-amber-400">⏳ {fmt} ({diff}d)</div>;
-    }
-    return <div className="mt-1 text-[10px] text-slate-400">📅 {fmt}</div>;
+    return <div className="mt-2 text-[10px] text-slate-400">📅 {fmt}</div>;
   };
 
   // Weekly Date Range Calc
@@ -1048,8 +1057,8 @@ export default function App() {
                               const clampedLeft = Math.max(0, leftPx);
                               const clampedW = Math.min(widthPx, GANTT_DAYS * DAY_W - clampedLeft);
                               
-                              const isOverdue = e < today && t.col !== 3 && t.col !== 4;
-                              const barColor = t.col === 3 ? 'var(--color-success)' : t.col === 4 ? '#64748b' : isOverdue ? 'var(--color-danger)' : SCOPE_CONFIGS[sc]?.color || '#ccc';
+                              const dStatus = (t.col !== 3 && t.col !== 4) ? getDeadlineStatus(t.deadline) : null;
+                              const barColor = t.col === 3 ? 'var(--color-success)' : t.col === 4 ? '#64748b' : dStatus?.kind === 'urgent' ? 'var(--color-danger)' : dStatus?.kind === 'near' ? 'var(--color-warning)' : SCOPE_CONFIGS[sc]?.color || '#ccc';
                               const progressW = Math.round((t.pct || 0) / 100 * clampedW);
 
                               return (
@@ -1061,7 +1070,8 @@ export default function App() {
                                       <span>{t.subtype || SCOPES[t.scope]}</span>
                                       {t.col === 3 && <span className="text-emerald-400 font-semibold">✓ Done</span>}
                                       {t.col === 4 && <span className="text-slate-400 font-semibold">✕ Reject</span>}
-                                      {isOverdue && <span className="text-rose-400 font-semibold">⚠ Overdue</span>}
+                                      {dStatus?.kind === 'urgent' && <span className="badge status-badge-danger">⚠ URGENT</span>}
+                                      {dStatus?.kind === 'near' && <span className="badge status-badge-warning">⏳ NEAR</span>}
                                     </div>
                                   </div>
                                   
@@ -1111,7 +1121,8 @@ export default function App() {
                 </div>
               ))}
               <div className="tl-legend-item"><div className="tl-legend-dot bg-emerald-500"></div>Completed</div>
-              <div className="tl-legend-item"><div className="tl-legend-dot bg-rose-500"></div>Overdue</div>
+              <div className="tl-legend-item"><div className="tl-legend-dot bg-rose-500"></div>URGENT (quá hạn)</div>
+              <div className="tl-legend-item"><div className="tl-legend-dot bg-amber-500"></div>NEAR (≤7 ngày)</div>
               <div className="tl-legend-item"><div className="tl-legend-dot bg-slate-500"></div>Rejected</div>
               <div className="text-[10px] text-slate-400 italic ml-auto">Click on any bar to edit task directly</div>
             </div>
