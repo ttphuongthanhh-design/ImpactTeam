@@ -143,6 +143,15 @@ const defaultSubtypes: Record<'ae' | 'si' | 'pd' | 'va' | 'pr', string[]> = {
 
 const GANTT_DAYS = 42; // 6 weeks view
 
+// --- Security: simple obfuscating hash + baked default edit password ---
+const hashPwd = (s: string) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return 'h' + h.toString(36);
+};
+// Default edit password baked into the file (travels with the file when shared).
+const BAKED_EDIT_HASH = hashPwd('G@M1234');
+
 const defaultTasks: Task[] = [
   { id: 1, title: 'Brief intake & concept — Q3 Activation', desc: '', scope: 'ae', subtype: 'Concept Development', assignee: 'T', priority: 'high', col: 1, start: '2025-07-01', deadline: '2025-07-08', pct: 40, note: 'Đang hoàn thiện mood board' },
   { id: 2, title: 'Vendor quotation — summer pop-up', desc: '', scope: 'pr', subtype: 'Quotation & Supplier', assignee: 'M', priority: 'high', col: 1, start: '2025-07-02', deadline: '2025-07-10', pct: 30, note: 'Đã liên hệ 3/6 vendor' },
@@ -271,24 +280,32 @@ export default function App() {
   const [weeklyNote, setWeeklyNote] = useState('');
 
   // --- Security / permissions ---
-  const [editPwdHash, setEditPwdHash] = useState<string>(() => localStorage.getItem('impact_editpwd') || '');
-  // If no password has been set yet, start editable so the owner can set one up.
-  const [isEditMode, setIsEditMode] = useState<boolean>(() => !localStorage.getItem('impact_editpwd'));
+  // Password = the owner's override (localStorage) if set, else the baked default (G@M1234).
+  const [editPwdHash, setEditPwdHash] = useState<string>(() => localStorage.getItem('impact_editpwd') || BAKED_EDIT_HASH);
+  // Default = View (locked). Owner unlocks with the password.
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
   const [pwdForm, setPwdForm] = useState({ next: '', confirm: '' });
-
-  const hashPwd = (s: string) => {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-    return 'h' + h.toString(36);
-  };
+  // Unlock (view -> edit) modal
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [unlockInput, setUnlockInput] = useState('');
+  const [unlockError, setUnlockError] = useState(false);
 
   const enterEditMode = () => {
-    if (!editPwdHash) { setIsEditMode(true); return; }
-    const p = window.prompt('Nhập mật khẩu để chuyển sang chế độ Chỉnh sửa:');
-    if (p == null) return;
-    if (hashPwd(p) === editPwdHash) setIsEditMode(true);
-    else alert('Mật khẩu không đúng.');
+    setUnlockInput('');
+    setUnlockError(false);
+    setShowUnlockModal(true);
+  };
+
+  const submitUnlock = () => {
+    if (hashPwd(unlockInput) === editPwdHash) {
+      setIsEditMode(true);
+      setShowUnlockModal(false);
+      setUnlockInput('');
+      setUnlockError(false);
+    } else {
+      setUnlockError(true);
+    }
   };
 
   const lockToView = () => setIsEditMode(false);
@@ -296,12 +313,12 @@ export default function App() {
   const handleSavePassword = () => {
     const next = pwdForm.next.trim();
     if (!next) {
-      // empty -> remove password protection
+      // empty -> reset to the baked default password (G@M1234)
       localStorage.removeItem('impact_editpwd');
-      setEditPwdHash('');
+      setEditPwdHash(BAKED_EDIT_HASH);
       setShowSecurityModal(false);
       setPwdForm({ next: '', confirm: '' });
-      alert('Đã gỡ mật khẩu. Mọi người mở file sẽ chỉnh sửa được.');
+      alert('Đã đặt lại về mật khẩu mặc định (G@M1234).');
       return;
     }
     if (next !== pwdForm.confirm.trim()) { alert('Mật khẩu nhập lại không khớp.'); return; }
@@ -310,7 +327,7 @@ export default function App() {
     setEditPwdHash(h);
     setShowSecurityModal(false);
     setPwdForm({ next: '', confirm: '' });
-    alert('Đã lưu mật khẩu. Lần mở sau sẽ ở chế độ Chỉ xem cho tới khi nhập đúng mật khẩu.');
+    alert('Đã lưu mật khẩu mới. Lần mở sau sẽ ở chế độ Chỉ xem cho tới khi nhập đúng mật khẩu.');
   };
 
   // Modal States
@@ -1491,12 +1508,17 @@ export default function App() {
           <div className="page active" id="pg-weekly">
             <div className="weekly-wrap">
               <div className="weekly-header">
-                <h2>Weekly Report — Team IMPACT</h2>
-                <div className="weekly-to">
-                  {weeklyFilter === 'all'
-                    ? <>Hiển thị <strong>tất cả các tuần</strong></>
-                    : <strong>{getWeekInfo(weeklyFilter).full}</strong>}
+                <div>
+                  <h2>Weekly Report — Team IMPACT</h2>
+                  <div className="weekly-to">
+                    {weeklyFilter === 'all'
+                      ? <>Hiển thị <strong>tất cả các tuần</strong></>
+                      : <strong>{getWeekInfo(weeklyFilter).full}</strong>}
+                  </div>
                 </div>
+                <button className="btn-g no-print" onClick={handlePrintWeekly}>
+                  <FileText size={12} /> Export PDF
+                </button>
               </div>
 
               {/* Filter header — filter by week (derived from Start Date) */}
@@ -1672,12 +1694,6 @@ export default function App() {
                 />
               </div>
 
-              {/* PDF Print trigger */}
-              <div className="flex justify-end mt-4 no-print">
-                <button className="btn-g" onClick={handlePrintWeekly}>
-                  <FileText size={12} /> Export PDF
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -1993,6 +2009,37 @@ export default function App() {
 
             <div className="modal-actions">
               <button type="button" onClick={() => { resetMemberForm(); setIsMemberModalOpen(false); }}>Đóng</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUnlockModal && (
+        <div className="modal-bg show">
+          <div className="modal modal-sm">
+            <h3>
+              <span>Nhập mật khẩu để Chỉnh sửa</span>
+              <button type="button" className="bg-transparent border-none text-slate-400 hover:text-slate-200 p-1" onClick={() => setShowUnlockModal(false)}>
+                <X size={16} />
+              </button>
+            </h3>
+            <div className="fg">
+              <label>Mật khẩu</label>
+              <input
+                type="password"
+                autoFocus
+                value={unlockInput}
+                onChange={e => { setUnlockInput(e.target.value); setUnlockError(false); }}
+                onKeyDown={e => { if (e.key === 'Enter') submitUnlock(); }}
+                placeholder="Nhập mật khẩu..."
+              />
+              {unlockError && <span className="text-[11px] text-danger" style={{ marginTop: 6, display: 'block' }}>Mật khẩu không đúng. Thử lại.</span>}
+            </div>
+            <div className="modal-actions">
+              <button type="button" onClick={() => setShowUnlockModal(false)}>Hủy</button>
+              <button type="button" className="btn-p" onClick={submitUnlock}>
+                <Unlock size={14} /> Mở khoá
+              </button>
             </div>
           </div>
         </div>

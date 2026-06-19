@@ -1120,6 +1120,10 @@ button:active {
   margin-bottom: 16px;
   color: #fff;
   box-shadow: 0 4px 25px rgba(99, 102, 241, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 .weekly-header h2 {
   font-size: 18px;
