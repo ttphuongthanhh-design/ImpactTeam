@@ -82,7 +82,7 @@ const SCOPES: Record<'ae' | 'si' | 'pd' | 'va' | 'pr', string> = {
   si: 'Social & Influencers',
   pd: 'Performance & Data',
   va: 'Visual & AI',
-  pr: 'Production'
+  pr: 'Production & Operation'
 };
 
 const SCOPE_CONFIGS: Record<'ae' | 'si' | 'pd' | 'va' | 'pr', ScopeConfig> = {
@@ -115,8 +115,8 @@ const SCOPE_CONFIGS: Record<'ae' | 'si' | 'pd' | 'va' | 'pr', ScopeConfig> = {
     text: 'text-teal-400'
   },
   pr: {
-    name: 'Production', 
-    color: '#f43f5e', 
+    name: 'Production & Operation',
+    color: '#f43f5e',
     glow: 'rgba(244, 63, 94, 0.25)', 
     badge: 'bg-rose-950/40 text-rose-400 border border-rose-800/30',
     text: 'text-rose-400'
@@ -537,7 +537,11 @@ export default function App() {
     const monday = new Date(d); monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
     const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
     const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
-    const weekOfMonth = Math.ceil(monday.getDate() / 7);
+    // Week-of-month matching the real calendar grid (Mon-start):
+    // account for the weekday offset of the 1st of the (Monday's) month.
+    const firstOfMonth = new Date(monday.getFullYear(), monday.getMonth(), 1);
+    const firstOffset = (firstOfMonth.getDay() + 6) % 7; // Mon=0 … Sun=6
+    const weekOfMonth = Math.ceil((monday.getDate() + firstOffset) / 7);
     const label = `Week ${weekOfMonth}`;
     const range = `${monday.getDate()}/${monday.getMonth() + 1}/${monday.getFullYear()} - ${sunday.getDate()}/${sunday.getMonth() + 1}/${sunday.getFullYear()}`;
     // Full display: Week {n} - {dd/mm/yyyy} - {dd/mm/yyyy}  (n = week-of-month)
