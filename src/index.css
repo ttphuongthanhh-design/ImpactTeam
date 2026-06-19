@@ -1650,17 +1650,65 @@ button:active {
 }
 
 @media print {
-  nav, .no-print, button, input[type="date"], select, textarea {
-    display: none !important;
+  @page { margin: 10mm; }
+
+  /* Render ALL colors/backgrounds exactly like on screen */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  body {
-    background: #fff !important;
-    color: #000 !important;
+
+  /* Always print on a light theme so colors match the website UI */
+  :root, .dark {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f1f5f9;
+    --panel-bg: #ffffff;
+    --panel-border: #cbd5e1;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --card-bg: #ffffff;
+    --card-hover-bg: #ffffff;
+    --input-bg: #ffffff;
+    --input-text: #0f172a;
+    --col-bg: #e2e8f0;
+  }
+  body { background: #ffffff !important; }
+
+  /* Hide chrome, but KEEP the report's data fields visible */
+  nav, .no-print { display: none !important; }
+  .page:not(.print-target) { display: none !important; }
+  .print-target { display: block !important; padding: 0 !important; }
+
+  /* Form fields inside the report print as clean static text (with their values) */
+  .note-input, .status-sel, .pct-input, .daily-date-picker {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    resize: none !important;
+    color: var(--text-main) !important;
+    padding: 2px 0 !important;
     font-size: 11px !important;
   }
-  .print-target {
-    display: block !important;
-    padding: 0 !important;
+  .status-sel { padding-right: 0 !important; }
+  /* keep notes readable & wrapping nicely */
+  .note-input { white-space: pre-wrap !important; overflow: visible !important; height: auto !important; }
+
+  /* Let table columns size to content instead of squeezing/wrapping mid-word */
+  .daily-table { table-layout: auto !important; }
+  .daily-table th, .daily-table td {
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 6px 8px !important;
+    font-size: 10.5px !important;
+  }
+
+  /* Avoid ugly page breaks inside report blocks */
+  .daily-section, .daily-summary, .kpi-card, .member-row,
+  .overdue-item, .highlight-box, .scope-kpi-grid > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }
 

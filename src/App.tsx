@@ -455,7 +455,7 @@ export default function App() {
           updated.col = +value;
           if (updated.col === 3) updated.pct = 100;
         } else if (field === 'note') {
-          updated.note = value.trim();
+          updated.note = value; // keep raw text (do not trim on each keystroke, or spaces get eaten)
         }
         // Keep completion date in sync with Done status
         if (updated.col === 3 && !updated.completedAt) {
