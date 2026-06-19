@@ -483,6 +483,10 @@ button:active {
   margin-left: auto;
   font-style: italic;
 }
+.week-select {
+  min-width: 230px;
+  cursor: pointer;
+}
 .daily-empty {
   margin-top: 16px;
   padding: 24px;

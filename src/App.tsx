@@ -239,6 +239,12 @@ export default function App() {
   });
   const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [dailyFilterMode, setDailyFilterMode] = useState<'date' | 'all'>('date');
+  // Weekly Report filter: a Monday key (yyyy-mm-dd) of the selected week, or 'all'
+  const [weeklyFilter, setWeeklyFilter] = useState<string>(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    const monday = new Date(d); monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+  });
   const [weeklyNote, setWeeklyNote] = useState('');
 
   // Modal States
@@ -506,6 +512,42 @@ export default function App() {
   };
 
   // Date Label Helper for Kanban
+  // --- Weekly filter helpers (week = Monday→Sunday, auto-numbered W{n}/{month}) ---
+  const getWeekInfo = (dateStr: string) => {
+    const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+    const monday = new Date(d); monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+    const weekOfMonth = Math.ceil(monday.getDate() / 7);
+    const label = `W${weekOfMonth}/${monday.getMonth() + 1}`;
+    const range = `${monday.getDate()}/${monday.getMonth() + 1} – ${sunday.getDate()}/${sunday.getMonth() + 1}/${sunday.getFullYear()}`;
+    return { key, monday, sunday, weekOfMonth, label, range };
+  };
+
+  // A task belongs to the selected week based on its Start Date
+  const inSelectedWeek = (t: Task) => {
+    if (weeklyFilter === 'all') return true;
+    if (!t.start) return false;
+    return getWeekInfo(t.start).key === weeklyFilter;
+  };
+
+  // Distinct weeks derived from task Start Dates (+ current week), newest first
+  const getWeekOptions = () => {
+    const map = new Map<string, ReturnType<typeof getWeekInfo>>();
+    tasks.forEach(t => {
+      if (t.start) { const wi = getWeekInfo(t.start); if (!map.has(wi.key)) map.set(wi.key, wi); }
+    });
+    const cur = getWeekInfo(new Date().toISOString().split('T')[0]);
+    if (!map.has(cur.key)) map.set(cur.key, cur);
+    return [...map.values()].sort((a, b) => b.key.localeCompare(a.key));
+  };
+
+  const shiftWeek = (delta: number) => {
+    const base = weeklyFilter === 'all' ? getWeekInfo(new Date().toISOString().split('T')[0]).monday : new Date(weeklyFilter);
+    base.setDate(base.getDate() + delta * 7);
+    setWeeklyFilter(getWeekInfo(`${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`).key);
+  };
+
   // Unified deadline classification used across Kanban, Gantt, and the At-Risk panel.
   // URGENT = past deadline · NEAR = due within 7 days · normal = further out.
   const getDeadlineStatus = (deadline: string) => {
@@ -1347,14 +1389,57 @@ export default function App() {
               <div className="weekly-header">
                 <h2>Weekly Report — Team IMPACT</h2>
                 <div className="weekly-to">
-                  Tuần từ <strong>{getWeeklyDateRange().mon.toLocaleDateString('vi-VN')}</strong> đến <strong>{getWeeklyDateRange().sun.toLocaleDateString('vi-VN')}</strong>
+                  {weeklyFilter === 'all'
+                    ? <>Hiển thị <strong>tất cả các tuần</strong></>
+                    : <>{getWeekInfo(weeklyFilter).label} · <strong>{getWeekInfo(weeklyFilter).range}</strong></>}
                 </div>
               </div>
+
+              {/* Filter header — filter by week (derived from Start Date) */}
+              <div className="daily-filter no-print mt-4">
+                <span className="daily-filter-label">Lọc theo tuần (Start Date):</span>
+                <button className="fb" onClick={() => shiftWeek(-1)} title="Tuần trước">‹</button>
+                <select
+                  className="daily-date-picker week-select"
+                  value={weeklyFilter}
+                  onChange={e => setWeeklyFilter(e.target.value)}
+                >
+                  <option value="all">Tất cả các tuần</option>
+                  {getWeekOptions().map(w => (
+                    <option value={w.key} key={w.key}>{w.label}/{w.monday.getFullYear()} · {w.range}</option>
+                  ))}
+                </select>
+                <button className="fb" onClick={() => shiftWeek(1)} title="Tuần sau">›</button>
+                <button
+                  className="fb"
+                  onClick={() => setWeeklyFilter(getWeekInfo(new Date().toISOString().split('T')[0]).key)}
+                >
+                  Tuần này
+                </button>
+                <button
+                  className={`fb ${weeklyFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setWeeklyFilter('all')}
+                >
+                  Tất cả
+                </button>
+                <span className="daily-filter-hint">
+                  {weeklyFilter === 'all'
+                    ? 'Đang hiển thị mọi task'
+                    : 'Chỉ tổng hợp task có Start Date trong tuần đã chọn'}
+                </span>
+              </div>
+
+              {weeklyFilter !== 'all' && !tasks.some(t => inSelectedWeek(t)) && (
+                <div className="daily-empty">
+                  Không có task nào có Start Date trong tuần <strong>{getWeekInfo(weeklyFilter).label} ({getWeekInfo(weeklyFilter).range})</strong>.
+                  Chọn tuần khác hoặc bấm "Tất cả".
+                </div>
+              )}
 
               {/* Weekly content - KPIs by Scope */}
               <div className="scope-kpi-grid mt-4">
                 {(['ae', 'si', 'da', 'pr'] as const).map(sc => {
-                  const st = tasks.filter(t => t.scope === sc);
+                  const st = tasks.filter(t => t.scope === sc && inSelectedWeek(t));
                   if (!st.length) return null;
 
                   const pct = Math.round(st.reduce((sum, t) => sum + (t.pct || 0), 0) / st.length);
@@ -1395,7 +1480,7 @@ export default function App() {
                 <h3>Weekly Workload Summary</h3>
                 {members.map(mem => {
                   const m = mem.id;
-                  const mt = tasks.filter(t => t.assignee === m);
+                  const mt = tasks.filter(t => t.assignee === m && inSelectedWeek(t));
                   const matched = (['ae', 'si', 'da', 'pr'] as const).filter(sc => mt.some(t => t.scope === sc));
                   const scArr = matched.length ? matched : (['ae', 'si', 'da', 'pr'] as const);
 
@@ -1447,11 +1532,12 @@ export default function App() {
               {/* Highlights & Attention */}
               {(() => {
                 const overdue = tasks.filter(t => {
+                  if (!inSelectedWeek(t)) return false;
                   if (!t.deadline || t.col === 3 || t.col === 4) return false;
                   const d = new Date(t.deadline); d.setHours(0,0,0,0);
                   return d < new Date();
                 });
-                const hi = tasks.filter(t => t.priority === 'high' && t.col !== 3 && t.col !== 4);
+                const hi = tasks.filter(t => inSelectedWeek(t) && t.priority === 'high' && t.col !== 3 && t.col !== 4);
 
                 if (!overdue.length && !hi.length) return null;
 
