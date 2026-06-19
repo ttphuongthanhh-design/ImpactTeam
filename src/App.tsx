@@ -260,9 +260,10 @@ export default function App() {
   const [dailyFilterMode, setDailyFilterMode] = useState<'date' | 'all'>('date');
   // Weekly Report filter: a Monday key (yyyy-mm-dd) of the selected week, or 'all'
   const [weeklyFilter, setWeeklyFilter] = useState<string>(() => {
-    const d = new Date(); d.setHours(0, 0, 0, 0);
-    const monday = new Date(d); monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-    return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+    const d = new Date();
+    const startDay = (Math.ceil(d.getDate() / 7) - 1) * 7 + 1;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(startDay)}`;
   });
   const [weeklyNote, setWeeklyNote] = useState('');
 
@@ -531,22 +532,26 @@ export default function App() {
   };
 
   // Date Label Helper for Kanban
-  // --- Weekly filter helpers (week = Monday→Sunday, auto-numbered W{n}/{month}) ---
+  // --- Weekly filter helpers ---
+  // Weeks are month-bounded day chunks: W1 = days 1–7, W2 = 8–14, W3 = 15–21,
+  // W4 = 22–28, W5 = 29–end. A week never spans into the next month.
+  // Format: "Week {n} - dd/mm/yy - dd/mm/yy"
   const getWeekInfo = (dateStr: string) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
     const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
-    const monday = new Date(d); monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-    const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
-    // Week-of-month matching the real calendar grid (Mon-start):
-    // account for the weekday offset of the 1st of the (Monday's) month.
-    const firstOfMonth = new Date(monday.getFullYear(), monday.getMonth(), 1);
-    const firstOffset = (firstOfMonth.getDay() + 6) % 7; // Mon=0 … Sun=6
-    const weekOfMonth = Math.ceil((monday.getDate() + firstOffset) / 7);
+    const year = d.getFullYear(); const month = d.getMonth(); const day = d.getDate();
+    const weekOfMonth = Math.ceil(day / 7); // 1..5
+    const startDay = (weekOfMonth - 1) * 7 + 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const endDay = Math.min(weekOfMonth * 7, daysInMonth);
+    const start = new Date(year, month, startDay);
+    const end = new Date(year, month, endDay);
+    const key = `${year}-${pad(month + 1)}-${pad(startDay)}`;
     const label = `Week ${weekOfMonth}`;
-    const range = `${monday.getDate()}/${monday.getMonth() + 1}/${monday.getFullYear()} - ${sunday.getDate()}/${sunday.getMonth() + 1}/${sunday.getFullYear()}`;
-    // Full display: Week {n} - {dd/mm/yyyy} - {dd/mm/yyyy}  (n = week-of-month)
+    const fmt = (dt: Date) => `${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}/${String(dt.getFullYear()).slice(-2)}`;
+    const range = `${fmt(start)} - ${fmt(end)}`;
     const full = `${label} - ${range}`;
-    return { key, monday, sunday, weekOfMonth, label, range, full };
+    return { key, start, end, weekOfMonth, label, range, full };
   };
 
   // A task belongs to the selected week based on its Start Date
@@ -568,9 +573,13 @@ export default function App() {
   };
 
   const shiftWeek = (delta: number) => {
-    const base = weeklyFilter === 'all' ? getWeekInfo(new Date().toISOString().split('T')[0]).monday : new Date(weeklyFilter);
-    base.setDate(base.getDate() + delta * 7);
-    setWeeklyFilter(getWeekInfo(`${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`).key);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const baseISO = weeklyFilter === 'all' ? getWeekInfo(new Date().toISOString().split('T')[0]).key : weeklyFilter;
+    const wi = getWeekInfo(baseISO);
+    // step into the adjacent chunk (handles month boundaries automatically)
+    const target = new Date(delta > 0 ? wi.end : wi.start);
+    target.setDate(target.getDate() + (delta > 0 ? 1 : -1));
+    setWeeklyFilter(getWeekInfo(`${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`).key);
   };
 
   // Unified deadline classification used across Kanban, Gantt, and the At-Risk panel.
