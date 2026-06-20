@@ -543,6 +543,83 @@ button:active {
   cursor: pointer;
 }
 .lock-gear:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* ============================================================
+   MOBILE RESPONSIVE (phones / small tablets)
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Navigation wraps instead of overflowing */
+  nav {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 2px 4px;
+  }
+  .nav-logo {
+    font-size: 13px;
+    padding: 6px 10px 6px 0;
+    margin-right: 8px;
+    border-right: none;
+  }
+  .nav-tab { padding: 8px 9px; font-size: 12px; }
+  .nav-right { margin-left: auto; gap: 6px; }
+  .nav-right .btn-p { padding: 6px 10px; font-size: 12px; }
+  .lock-pill { margin-right: 4px; padding: 5px 9px; font-size: 11px; }
+
+  /* Page padding */
+  main { padding-left: 12px !important; padding-right: 12px !important; }
+
+  /* Dashboard grids collapse */
+  .dash-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .dash-row, .dash-row-3 { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Kanban: horizontal scroll, each column ~85% wide */
+  .board {
+    grid-template-columns: repeat(5, 85%);
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Weekly KPI cards stack */
+  .scope-kpi-grid { grid-template-columns: 1fr; }
+
+  /* Wide tables scroll horizontally instead of squishing */
+  .daily-section { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .daily-table { min-width: 620px; }
+
+  /* Banners / headers stack their action button below */
+  .weekly-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .daily-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+
+  /* Weekly workload rows wrap */
+  .member-row { flex-wrap: wrap; gap: 10px; }
+  .wl-bars { width: 100%; }
+
+  /* Filter bars + top bar wrap nicely */
+  .top-bar { gap: 8px; }
+  .daily-filter { gap: 8px; }
+  .daily-filter-hint { margin-left: 0; width: 100%; }
+  .week-select { min-width: 0; flex: 1; }
+  .search-wrap { width: 100%; }
+  .search-wrap input { width: 100%; }
+
+  /* Modals fill the screen width */
+  .modal { width: 92vw; padding: 18px; }
+  .fg-row { grid-template-columns: 1fr; gap: 0; }
+
+  /* Gantt scrolls horizontally */
+  .gantt-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+@media (max-width: 480px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .board { grid-template-columns: repeat(5, 90%); }
+  .dash-card .dc-val { font-size: 26px; }
+  .nav-tab { padding: 7px 7px; font-size: 11px; }
+}
 .daily-empty {
   margin-top: 16px;
   padding: 24px;

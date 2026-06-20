@@ -280,12 +280,10 @@ export default function App() {
   const [weeklyNote, setWeeklyNote] = useState('');
 
   // --- Security / permissions ---
-  // Password = the owner's override (localStorage) if set, else the baked default (G@M1234).
-  const [editPwdHash, setEditPwdHash] = useState<string>(() => localStorage.getItem('impact_editpwd') || BAKED_EDIT_HASH);
+  // Fixed edit password baked into the file (G@M1234).
+  const editPwdHash = BAKED_EDIT_HASH;
   // Default = View (locked). Owner unlocks with the password.
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
-  const [showSecurityModal, setShowSecurityModal] = useState(false);
-  const [pwdForm, setPwdForm] = useState({ next: '', confirm: '' });
   // Unlock (view -> edit) modal
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [unlockInput, setUnlockInput] = useState('');
@@ -309,26 +307,6 @@ export default function App() {
   };
 
   const lockToView = () => setIsEditMode(false);
-
-  const handleSavePassword = () => {
-    const next = pwdForm.next.trim();
-    if (!next) {
-      // empty -> reset to the baked default password (G@M1234)
-      localStorage.removeItem('impact_editpwd');
-      setEditPwdHash(BAKED_EDIT_HASH);
-      setShowSecurityModal(false);
-      setPwdForm({ next: '', confirm: '' });
-      alert('Đã đặt lại về mật khẩu mặc định (G@M1234).');
-      return;
-    }
-    if (next !== pwdForm.confirm.trim()) { alert('Mật khẩu nhập lại không khớp.'); return; }
-    const h = hashPwd(next);
-    localStorage.setItem('impact_editpwd', h);
-    setEditPwdHash(h);
-    setShowSecurityModal(false);
-    setPwdForm({ next: '', confirm: '' });
-    alert('Đã lưu mật khẩu mới. Lần mở sau sẽ ở chế độ Chỉ xem cho tới khi nhập đúng mật khẩu.');
-  };
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -729,14 +707,9 @@ export default function App() {
           </button>
 
           {isEditMode ? (
-            <>
-              <button className="lock-pill unlocked" onClick={lockToView} title="Khoá lại (chuyển sang Chỉ xem)">
-                <Unlock size={13} /> Đang chỉnh sửa
-              </button>
-              <button className="lock-gear" onClick={() => { setPwdForm({ next: '', confirm: '' }); setShowSecurityModal(true); }} title="Cài đặt mật khẩu">
-                <Settings size={14} />
-              </button>
-            </>
+            <button className="lock-pill unlocked" onClick={lockToView} title="Khoá lại (chuyển sang Chỉ xem)">
+              <Unlock size={13} /> Đang chỉnh sửa
+            </button>
           ) : (
             <button className="lock-pill locked" onClick={enterEditMode} title="Nhập mật khẩu để chỉnh sửa">
               <Lock size={13} /> Chỉ xem
@@ -2045,51 +2018,6 @@ export default function App() {
         </div>
       )}
 
-      {showSecurityModal && (
-        <div className="modal-bg show">
-          <div className="modal modal-sm">
-            <h3>
-              <span>Bảo mật — Mật khẩu chỉnh sửa</span>
-              <button type="button" className="bg-transparent border-none text-slate-400 hover:text-slate-200 p-1" onClick={() => setShowSecurityModal(false)}>
-                <X size={16} />
-              </button>
-            </h3>
-
-            <p className="text-[12px] text-muted" style={{ marginBottom: 12 }}>
-              {editPwdHash
-                ? 'Đặt mật khẩu mới, hoặc để trống rồi Lưu để gỡ khoá. Khi đã có mật khẩu, mỗi lần mở file sẽ ở chế độ Chỉ xem cho tới khi nhập đúng.'
-                : 'Chưa đặt mật khẩu — mọi người mở file đều chỉnh sửa được. Đặt mật khẩu để bật chế độ phân quyền Xem/Sửa.'}
-            </p>
-
-            <div className="fg">
-              <label>Mật khẩu mới</label>
-              <input
-                type="password"
-                value={pwdForm.next}
-                onChange={e => setPwdForm(prev => ({ ...prev, next: e.target.value }))}
-                placeholder="Nhập mật khẩu..."
-              />
-            </div>
-            <div className="fg">
-              <label>Nhập lại mật khẩu</label>
-              <input
-                type="password"
-                value={pwdForm.confirm}
-                onChange={e => setPwdForm(prev => ({ ...prev, confirm: e.target.value }))}
-                placeholder="Nhập lại..."
-                onKeyDown={e => { if (e.key === 'Enter') handleSavePassword(); }}
-              />
-            </div>
-
-            <div className="modal-actions">
-              <button type="button" onClick={() => setShowSecurityModal(false)}>Hủy</button>
-              <button type="button" className="btn-p" onClick={handleSavePassword}>
-                <Lock size={14} /> Lưu mật khẩu
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
